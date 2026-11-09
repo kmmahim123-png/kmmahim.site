@@ -5,14 +5,16 @@ import MealManager from './MealManager';
 import HabitsTracker from './HabitsTracker';
 import GoalsTracker from './GoalsTracker';
 import IdeaVault from './IdeaVault';
+import SocialPoster from './SocialPoster';
+import AgentHub from './AgentHub';
 import {
   Wallet, Utensils, CheckSquare, Lightbulb,
-  Share2, Bot, MessageSquare, Globe, Plus, Sparkles, Target
+  Share2, Bot, MessageSquare, Globe, Plus, Target
 } from 'lucide-react';
 
 export default function Layer2Shell() {
   const { data, setActiveLayer, updateProfile, addProject } = useOS();
-  const [activeTab, setActiveTab] = useState('habits');
+  const [activeTab, setActiveTab] = useState('agents');
 
   const [nowInput, setNowInput] = useState(data.profile.nowStatus);
   const [projTitle, setProjTitle] = useState('');
@@ -42,14 +44,14 @@ export default function Layer2Shell() {
   };
 
   const navItems = [
-    { id: 'cms', label: 'Layer-1 Control & Inbox', icon: MessageSquare, status: 'Live' },
-    { id: 'finance', label: 'Money & Wallets', icon: Wallet, status: 'Live' },
-    { id: 'meals', label: 'Smart Meal Manager', icon: Utensils, status: 'Live' },
-    { id: 'habits', label: 'Gym, Namaz & Minoxidil', icon: CheckSquare, status: 'Live' },
-    { id: 'goals', label: 'Study & Goals', icon: Target, status: 'Live' },
-    { id: 'ideas', label: 'Chulbul Idea Vault', icon: Lightbulb, status: 'Live' },
-    { id: 'social', label: 'Social Auto-Poster', icon: Share2, status: 'Part 4' },
-    { id: 'agents', label: 'OpenClaw, Grok & Hermes', icon: Bot, status: 'Part 4' }
+    { id: 'cms', label: 'Layer-1 Control & Inbox', icon: MessageSquare },
+    { id: 'finance', label: 'Money & Wallets', icon: Wallet },
+    { id: 'meals', label: 'Smart Meal Manager', icon: Utensils },
+    { id: 'habits', label: 'Gym, Namaz & Minoxidil', icon: CheckSquare },
+    { id: 'goals', label: 'Study & Goals', icon: Target },
+    { id: 'ideas', label: 'Chulbul Idea Vault', icon: Lightbulb },
+    { id: 'social', label: 'Social Auto-Poster', icon: Share2 },
+    { id: 'agents', label: 'OpenClaw, Grok & Hermes', icon: Bot }
   ];
 
   return (
@@ -64,7 +66,7 @@ export default function Layer2Shell() {
               </div>
               <div>
                 <h2 className="text-sm font-bold leading-none">Mahim Life OS</h2>
-                <span className="text-[10px] text-emerald-400 font-mono">● PRIVATE LAYER 2</span>
+                <span className="text-[10px] text-emerald-400 font-mono">● ALL SYSTEMS LIVE</span>
               </div>
             </div>
           </div>
@@ -86,14 +88,8 @@ export default function Layer2Shell() {
                     <Icon className="w-4 h-4"/>
                     <span>{item.label}</span>
                   </span>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      item.status === 'Live'
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'opacity-60'
-                    }`}
-                  >
-                    {item.status}
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                    Live
                   </span>
                 </button>
               );
@@ -153,7 +149,7 @@ export default function Layer2Shell() {
                 </h3>
                 <input
                   type="text"
-                  placeholder="Project or Brand Name (e.g. New SaaS App)"
+                  placeholder="Project or Brand Name"
                   value={projTitle}
                   onChange={(e) => setProjTitle(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
@@ -168,7 +164,7 @@ export default function Layer2Shell() {
                   />
                   <input
                     type="text"
-                    placeholder="Key Metric (e.g. 10k+ Users)"
+                    placeholder="Key Metric"
                     value={projMetrics}
                     onChange={(e) => setProjMetrics(e.target.value)}
                     className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
@@ -176,7 +172,7 @@ export default function Layer2Shell() {
                 </div>
                 <textarea
                   rows="2"
-                  placeholder="Short case-study description..."
+                  placeholder="Short description..."
                   value={projDesc}
                   onChange={(e) => setProjDesc(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
@@ -214,16 +210,8 @@ export default function Layer2Shell() {
         {activeTab === 'habits' && <HabitsTracker/>}
         {activeTab === 'goals' && <GoalsTracker/>}
         {activeTab === 'ideas' && <IdeaVault/>}
-
-        {['social', 'agents'].includes(activeTab) && (
-          <div className="p-12 rounded-2xl bg-slate-900/50 border border-slate-800 text-center space-y-3">
-            <Sparkles className="w-10 h-10 text-indigo-400 mx-auto"/>
-            <h2 className="text-xl font-bold">Ready for Part 4</h2>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Habits, Goals, Study Pomodoro Timer, and Chulbul Idea Vault are now 100% live! Paste <strong>Part 4</strong> next to unlock OpenClaw / Grok / Hermes Agent Hub, Social Media Auto-Poster, and Android APK compilation guide.
-            </p>
-          </div>
-        )}
+        {activeTab === 'social' && <SocialPoster/>}
+        {activeTab === 'agents' && <AgentHub/>}
       </main>
     </div>
   );
