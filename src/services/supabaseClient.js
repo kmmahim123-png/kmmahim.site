@@ -206,3 +206,69 @@ export function subscribeToLifeOS(slotId = 'primary_os', onRemoteUpdate) {
     supabase.removeChannel(channel);
   };
 }
+
+/**
+ * Submit a public client consultation inquiry safely to dedicated table (never touches primary_os)
+ */
+export async function submitPublicInquiry({ sender, email, service, meetingDate, text }) {
+  try {
+    const payload = {
+      sender: String(sender || '').slice(0, 120),
+      email: String(email || '').slice(0, 160),
+      service: String(service || '').slice(0, 160),
+      meeting_date: String(meetingDate || 'Flexible').slice(0, 60),
+      text: String(text || '').slice(0, 2000)
+    };
+    const { data, error } = await supabase
+      .from('public_inquiries')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function fetchPublicInquiries() {
+  try {
+    const { data, error } = await supabase
+      .from('public_inquiries')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) return { success: false, items: [], message: error.message };
+    return {
+      success: true,
+      items: (data || []).map((row) => ({
+        id: `inq_${row.id}`,
+        dbId: row.id,
+        sender: row.sender,
+        email: row.email,
+        service: row.service,
+        meetingDate: row.meeting_date,
+        date: row.created_at ? new Date(row.created_at).toLocaleString() : '',
+        text: row.text,
+        type: 'client',
+        read: false
+      }))
+    };
+  } catch (err) {
+    return { success: false, items: [], message: err.message };
+  }
+}
+
+export async function deletePublicInquiry(dbId) {
+  if (!dbId) return { success: false };
+  try {
+    const { error } = await supabase.from('public_inquiries').delete().eq('id', dbId);
+    return { success: !error };
+  } catch {
+    return { success: false };
+  }
+}

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { OSProvider, useOS } from './context/OSContext';
 import Layer1Public from './components/Layer1Public';
-import Layer2Shell from './components/Layer2Shell';
 import { Lock, X, RefreshCw } from 'lucide-react';
+
+const Layer2Shell = lazy(() => import('./components/Layer2Shell'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,32 +16,27 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error('App Error Caught by Boundary:', error, errorInfo);
   }
-  handleReset = () => {
-    try {
-      localStorage.removeItem('KM_MAHIM_LIFE_OS_V1');
-      window.location.reload();
-    } catch {
-      window.location.reload();
-    }
+  handleReload = () => {
+    window.location.reload();
   };
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#05070e] text-slate-100 flex items-center justify-center p-6 text-center">
-          <div className="max-w-md w-full p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/30 shadow-2xl space-y-4">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-lg">
+        <div className="min-h-screen bg-[#fbfbfd] text-[#1d1d1f] flex items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full p-8 rounded-[28px] bg-white border border-black/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.08)] space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-[#f5f5f7] text-[#1d1d1f] flex items-center justify-center font-bold text-base">
               OS
             </div>
-            <h2 className="text-xl font-bold text-white">System Handshake Protocol</h2>
-            <p className="text-xs text-slate-400">
-              The application recovered from an unexpected state. Click below to refresh the workspace cleanly.
+            <h2 className="font-display text-xl font-semibold text-[#1d1d1f]">System Recovery</h2>
+            <p className="text-xs text-[#6e6e73]">
+              An unexpected UI state occurred. Reload safely to restore your workspace without losing saved records.
             </p>
             <button
-              onClick={this.handleReset}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 mx-auto transition"
+              onClick={this.handleReload}
+              className="px-6 py-2.5 rounded-full bg-[#1d1d1f] hover:bg-black text-white font-medium text-xs flex items-center justify-center gap-2 mx-auto transition"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Refresh & Restore OS</span>
+              <span>Reload Workspace</span>
             </button>
           </div>
         </div>
@@ -113,7 +109,19 @@ function MainRouter() {
   return (
     <>
       <SecretPinModal/>
-      {activeLayer === 'private' ? <Layer2Shell/> : <Layer1Public/>}
+      {activeLayer === 'private' ? (
+        <Suspense
+          fallback={
+            <div className="min-h-screen bg-[#04060c] text-slate-300 flex items-center justify-center text-xs font-mono">
+              Initializing Private Life OS...
+            </div>
+          }
+        >
+          <Layer2Shell/>
+        </Suspense>
+      ) : (
+        <Layer1Public/>
+      )}
     </>
   );
 }

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import { getLocalDateStr } from '../utils/dateUtils';
 import { AppleActivityRings } from './common/MotionKit';
 import { SoundFX } from './common/SoundEffects';
 import {
-  CheckSquare, Dumbbell, Sparkles, Droplets, CheckCircle2, Plus, Trash2
+  CheckSquare, Dumbbell, Sparkles, Droplets, CheckCircle2, Plus, Trash2, Flame
 } from 'lucide-react';
 
 export default function HabitsTracker() {
@@ -19,8 +20,42 @@ export default function HabitsTracker() {
 
   const { minoxidilBottleStart, dailyLogs, customHabits = [] } = data.habits;
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = getLocalDateStr();
   const [selectedDate, setSelectedDate] = useState(todayKey);
+
+  // Build 84-day (12 weeks) GitHub-style Contribution Heatmap
+  const heatmapDays = useMemo(() => {
+    const arr = [];
+    const base = new Date();
+    for (let i = 83; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const key = getLocalDateStr(d);
+      const log = dailyLogs[key];
+      let score = 0;
+      if (log) {
+        score += log.namaz ? Object.values(log.namaz).filter(Boolean).length : 0;
+        score += log.gym?.done ? 2 : 0;
+        score += log.minoxidil ? Object.values(log.minoxidil).filter(Boolean).length : 0;
+      }
+      arr.push({ key, score });
+    }
+    return arr;
+  }, [dailyLogs]);
+
+  const activeStreak = useMemo(() => {
+    let streak = 0;
+    const base = new Date();
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      const log = dailyLogs[getLocalDateStr(d)];
+      const nCount = log?.namaz ? Object.values(log.namaz).filter(Boolean).length : 0;
+      if (nCount > 0 || log?.gym?.done) streak++;
+      else if (i > 0) break;
+    }
+    return streak;
+  }, [dailyLogs]);
 
   // Add Custom Habit State
   const [habitTitle, setHabitTitle] = useState('');
@@ -371,6 +406,43 @@ export default function HabitsTracker() {
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 84-Day Consistency Heatmap & Streak */}
+      <div className="glass-crystal rounded-3xl p-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-bold text-sm text-white flex items-center gap-2">
+            <Flame className="w-4 h-4 text-amber-400" />
+            <span>১২-সপ্তাহের ডিসিপ্লিন হিটম্যাপ (Habit Consistency Grid)</span>
+          </h3>
+          <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono font-bold">
+            🔥 Current Streak: {activeStreak} Days
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {heatmapDays.map((cell) => {
+            const bg =
+              cell.score >= 7
+                ? 'bg-emerald-400'
+                : cell.score >= 4
+                ? 'bg-emerald-500/70'
+                : cell.score > 0
+                ? 'bg-emerald-700/60'
+                : 'bg-white/5';
+            return (
+              <button
+                key={cell.key}
+                type="button"
+                title={`${cell.key}: Score ${cell.score}`}
+                onClick={() => setSelectedDate(cell.key)}
+                className={`w-4 h-4 rounded-sm ${bg} ${
+                  selectedDate === cell.key ? 'ring-2 ring-cyan-400' : ''
+                } transition`}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

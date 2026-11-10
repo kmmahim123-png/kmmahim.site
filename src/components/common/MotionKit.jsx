@@ -3,7 +3,7 @@ import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Smartphone, Download, Zap, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 // --- 3D TILT CARD COMPONENT ---
-export function TiltCard({ children, className = '', maxTilt = 12 }) {
+export function TiltCard({ children, className = '', maxTilt = 12, ...props }) {
   const cardRef = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -44,6 +44,16 @@ export function TiltCard({ children, className = '', maxTilt = 12 }) {
   return (
     <motion.div
       ref={cardRef}
+      {...props}
+      role={props.onClick ? props.role || 'button' : props.role}
+      tabIndex={props.onClick ? props.tabIndex ?? 0 : props.tabIndex}
+      onKeyDown={(e) => {
+        if (props.onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          props.onClick(e);
+        }
+        props.onKeyDown?.(e);
+      }}
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -51,6 +61,7 @@ export function TiltCard({ children, className = '', maxTilt = 12 }) {
         rotateX,
         rotateY,
         transformStyle: 'preserve-3d',
+        ...(props.style || {})
       }}
       whileHover={{ scale: 1.02 }}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}

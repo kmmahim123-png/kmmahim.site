@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
 import CommandPalette from './common/CommandPalette';
 import {
-  ArrowUpRight, ArrowRight, Check, Lock, Smartphone, Search, Terminal
+  ArrowUpRight, ArrowRight, Check, Lock, Smartphone, Search, Terminal, X
 } from 'lucide-react';
 
 const appleEase = [0.16, 1, 0.3, 1];
@@ -41,8 +41,10 @@ export default function Layer1Public() {
   const [meetingDate, setMeetingDate] = useState('');
   const [projectNote, setProjectNote] = useState('');
   const [bookingSent, setBookingSent] = useState(false);
+  const [bookingBusy, setBookingBusy] = useState(false);
   const [workFilter, setWorkFilter] = useState('All');
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [activeCaseStudy, setActiveCaseStudy] = useState(null);
 
   useEffect(() => {
     const handlePaletteTrigger = () => setShowCommandPalette(true);
@@ -50,16 +52,18 @@ export default function Layer1Public() {
     return () => window.removeEventListener('open-command-palette', handlePaletteTrigger);
   }, []);
 
-  const handleBookingSubmit = (e) => {
+  const handleBookingSubmit = async (e) => {
     e.preventDefault();
-    if (!clientName || !clientEmail) return;
-    sendClientMessage({
+    if (!clientName || !clientEmail || bookingBusy) return;
+    setBookingBusy(true);
+    await sendClientMessage({
       sender: clientName,
       email: clientEmail,
       service: selectedService,
       meetingDate: meetingDate || 'Flexible',
       text: projectNote || 'Consultation inquiry.'
     });
+    setBookingBusy(false);
     setBookingSent(true);
     setClientName('');
     setClientEmail('');
@@ -88,7 +92,7 @@ END:VCARD`;
 
   const cleanNowStatus = (profile.nowStatus || '').replace(/[\u{1F300}-\u{1FAFF}]/gu, '').trim();
 
-  // Architectural Portfolio Case Studies
+  // Architectural Portfolio Case Studies with Full Detail View
   const flagshipWork = [
     {
       id: 'fw1',
@@ -98,9 +102,14 @@ END:VCARD`;
       title: 'JACKFRU Apparel',
       description:
         'Founded and structured a physical-first apparel label engineered for retail store distribution across Australia and domestic commercial channels. Built custom manufacturing workflows, packaging standards, and inventory logistics.',
+      caseStudyDetails: {
+        problem: 'Bridging local Bangladesh garment production with strict Australian physical retail quality and timeline standards.',
+        architecture: 'Built direct factory QA checkpoints, standardized SKU sizing & packaging specs, and streamlined international dispatch.',
+        outcome: 'Active commercial distribution footprint with repeatable manufacturing pipelines.'
+      },
       specs: ['Australian Retail Ready', 'End-to-End Supply Chain', 'Commercial Merchandising'],
       span: 'md:col-span-7',
-      actionLabel: 'Inquire About Brand Architecture',
+      actionLabel: 'Read Case Study',
       actionHref: '#contact'
     },
     {
@@ -111,7 +120,12 @@ END:VCARD`;
       title: 'Autonomous Life OS',
       description:
         'Two-layer web and native Android operating environment unifying personal financial ledgers, academic targets, multi-agent automation (OpenClaw, Grok, Hermes), and real-time cloud synchronization.',
-      specs: ['React & Capacitor', 'Supabase Realtime', 'Multi-Agent Mesh'],
+      caseStudyDetails: {
+        problem: 'Fragmented spreadsheets, disconnected habit trackers, and manual bookkeeping across phone and laptop.',
+        architecture: 'React + Vite + Capacitor Android APK backed by Supabase PostgreSQL Realtime, Obsidian-style Second Brain, and Multi-Provider AI Tool Calling.',
+        outcome: 'Sub-second cross-device state orchestration with voice & AI copilot automation.'
+      },
+      specs: ['React & Capacitor', 'Supabase Realtime', 'AI Second Brain'],
       span: 'md:col-span-5',
       actionLabel: 'Access Private System',
       isPrivateTrigger: true
@@ -124,9 +138,14 @@ END:VCARD`;
       title: 'High-Conversion Web Platforms',
       description:
         'Bespoke responsive architectures developed for healthcare clinics, consumer commerce brands, and specialized service teams. Engineered for immediate loading, editorial clarity, and automated client booking.',
+      caseStudyDetails: {
+        problem: 'Slow, cluttered template websites losing mobile traffic and client conversion inquiries.',
+        architecture: 'Code-split React SPAs, zero-bloat Tailwind typography, automated Supabase lead capture, and WhatsApp intake.',
+        outcome: 'Sub-second perceived loads and higher qualified consultation bookings.'
+      },
       specs: ['Sub-Second Load', 'Conversion Architecture', 'Automated Intake'],
       span: 'md:col-span-6',
-      actionLabel: 'View Engagement Tiers',
+      actionLabel: 'Read Case Study',
       actionHref: '#capabilities'
     },
     {
@@ -137,6 +156,11 @@ END:VCARD`;
       title: 'Sports Science & Execution Discipline',
       description:
         'Studying within the Department of Physical Education & Sports Science at the University of Rajshahi. Translating structured athletic conditioning and physiological stamina directly into consistent engineering delivery.',
+      caseStudyDetails: {
+        problem: 'Maintaining cognitive consistency across software building, business operations, and academic research.',
+        architecture: 'Integrated habit tracking, spaced-repetition study flashcards, and physiological periodization.',
+        outcome: 'Repeatable daily sprint execution.'
+      },
       specs: ['Physical Conditioning', 'Daily Routine Precision', 'Long-Horizon Focus'],
       span: 'md:col-span-6',
       actionLabel: 'Download Contact Card',
@@ -144,9 +168,10 @@ END:VCARD`;
     }
   ];
 
-  // Combine flagship case studies with any newly published CMS projects from Layer 2
+  // Fixed: display ALL custom CMS projects added from Layer 2 (not hidden behind .slice(3))
+  const DEFAULT_PROJECT_IDS = new Set(['p1', 'p2', 'p3']);
   const customProjects = (projects || [])
-    .slice(3)
+    .filter((p) => !DEFAULT_PROJECT_IDS.has(p.id))
     .map((p, i) => ({
       id: p.id,
       index: `0${i + 5}`,
@@ -168,6 +193,70 @@ END:VCARD`;
 
   return (
     <div className="min-h-screen bg-[#fbfbfd] text-[#1d1d1f] font-sans selection:bg-[#1d1d1f] selection:text-white">
+      {/* Interactive Case Study Modal */}
+      <AnimatePresence>
+        {activeCaseStudy && (
+          <div
+            onClick={() => setActiveCaseStudy(null)}
+            className="fixed inset-0 z-50 bg-black/30 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="bg-white rounded-[28px] border border-black/[0.08] max-w-xl w-full p-7 sm:p-9 space-y-5 shadow-[0_24px_60px_rgba(0,0,0,0.14)] relative text-[#1d1d1f]"
+            >
+              <button
+                type="button"
+                onClick={() => setActiveCaseStudy(null)}
+                aria-label="Close case study"
+                className="absolute top-6 right-6 p-2 rounded-full text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-[#86868b] font-medium block">
+                {activeCaseStudy.index} / {activeCaseStudy.eyebrow}
+              </span>
+              <h3 className="font-display text-2xl sm:text-3xl font-semibold tracking-[-0.025em]">
+                {activeCaseStudy.title}
+              </h3>
+              <p className="text-sm text-[#6e6e73] leading-relaxed">{activeCaseStudy.description}</p>
+              {activeCaseStudy.caseStudyDetails && (
+                <div className="space-y-3 pt-2 border-t border-black/[0.08] text-xs">
+                  <div>
+                    <span className="font-semibold text-[#1d1d1f] block">Challenge</span>
+                    <p className="text-[#6e6e73] mt-0.5">{activeCaseStudy.caseStudyDetails.problem}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#1d1d1f] block">Architecture</span>
+                    <p className="text-[#6e6e73] mt-0.5">{activeCaseStudy.caseStudyDetails.architecture}</p>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#1d1d1f] block">Outcome</span>
+                    <p className="text-[#6e6e73] mt-0.5">{activeCaseStudy.caseStudyDetails.outcome}</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2 pt-2">
+                {activeCaseStudy.specs.map((sp) => (
+                  <span key={sp} className="px-3 py-1 rounded-full bg-[#f5f5f7] text-[11px] font-medium">
+                    {sp}
+                  </span>
+                ))}
+              </div>
+              <a
+                href="#contact"
+                onClick={() => setActiveCaseStudy(null)}
+                className="w-full block text-center py-3 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-xs font-medium"
+              >
+                Discuss This Scope
+              </a>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Minimal Spotlight Palette */}
       <CommandPalette
         isOpen={showCommandPalette}
@@ -179,8 +268,6 @@ END:VCARD`;
         onOpenDownload={() => {
           window.location.href = '/kmmahim-life-os.apk';
         }}
-        onToggleSound={() => {}}
-        soundOn={false}
       />
 
       {/* Apple-Grade Sticky Translucent Header */}
@@ -460,6 +547,15 @@ END:VCARD`;
                       <span>{item.actionLabel}</span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </button>
+                  ) : item.caseStudyDetails ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCaseStudy(item)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#1d1d1f] hover:opacity-70 transition-opacity"
+                    >
+                      <span>{item.actionLabel}</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
                   ) : (
                     <a
                       href={item.actionHref}
@@ -607,6 +703,11 @@ END:VCARD`;
                 <a href={profile.socials.youtube} target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f] transition-colors">
                   YouTube ↗
                 </a>
+                {profile.socials.github && (
+                  <a href={profile.socials.github} target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f] transition-colors">
+                    GitHub ↗
+                  </a>
+                )}
               </div>
             </div>
 

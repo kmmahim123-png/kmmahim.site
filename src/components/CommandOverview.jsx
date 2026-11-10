@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import { getLocalDateStr } from '../utils/dateUtils';
 import { AnimatedCounter, TiltCard } from './common/MotionKit';
 import { SoundFX } from './common/SoundEffects';
 import {
   Wallet, Utensils, CheckSquare, Target, Lightbulb, Sparkles,
-  Plus, Trash2, ArrowRight, Cloud, CheckCircle2, Flame, Zap, Rocket
+  ArrowRight, Zap
 } from 'lucide-react';
 
 export default function CommandOverview({ onNavigate }) {
@@ -18,7 +19,7 @@ export default function CommandOverview({ onNavigate }) {
     syncStatus
   } = useOS();
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = getLocalDateStr();
 
   // Quick Expense Inline State
   const [quickAmt, setQuickAmt] = useState('');

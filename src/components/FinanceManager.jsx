@@ -1,13 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import {
+  getLocalDateStr,
+  getLocalMonthStr,
+  getLocalYearStr,
+  diffCalendarDays
+} from '../utils/dateUtils';
 import { AnimatedCounter, TiltCard, CircularFinanceDonut } from './common/MotionKit';
 import SafeDeleteModal from './common/SafeDeleteModal';
 import { SoundFX } from './common/SoundEffects';
 import {
-  Wallet, PlusCircle, CheckCircle2, PieChart, Landmark, Smartphone,
+  Wallet, PlusCircle, CheckCircle2, Landmark, Smartphone,
   Banknote, Users, Pencil, Check, X, Trash2, ArrowRightLeft,
-  Calendar as CalendarIcon, List, TrendingUp, ChevronLeft, ChevronRight
+  Calendar as CalendarIcon, List, TrendingUp, ChevronLeft, ChevronRight,
+  Gauge, Repeat
 } from 'lucide-react';
 
 export default function FinanceManager() {
@@ -17,6 +24,10 @@ export default function FinanceManager() {
     transferBetweenWallets,
     addTransaction,
     deleteTransaction,
+    setCategoryBudget,
+    addRecurringBill,
+    logRecurringBill,
+    deleteRecurringBill,
     addDebt,
     toggleDebtSettled,
     deleteDebt,
@@ -24,6 +35,8 @@ export default function FinanceManager() {
   } = useOS();
 
   const { wallets, transactions, debts } = data.finance;
+  const budgets = data.budgets || {};
+  const recurringBills = data.recurringBills || [];
 
   // Direct Wallet Edit State
   const [editingWallet, setEditingWallet] = useState(null);
@@ -36,12 +49,12 @@ export default function FinanceManager() {
   const [toWallet, setToWallet] = useState('cash');
   const [category, setCategory] = useState('Food & Meal');
   const [note, setNote] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(getLocalDateStr());
   const [timeFilter, setTimeFilter] = useState('all'); // 'today' | 'week' | 'month' | 'year' | 'all'
 
   // History View Mode: 'list' | 'calendar'
   const [historyView, setHistoryView] = useState('list');
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [calendarMonth, setCalendarMonth] = useState(() => getLocalMonthStr()); // YYYY-MM
   const [selectedCalDate, setSelectedCalDate] = useState(null);
 
   // Debt Form State
@@ -50,17 +63,23 @@ export default function FinanceManager() {
   const [debtAmount, setDebtAmount] = useState('');
   const [debtNote, setDebtNote] = useState('');
 
+  // Budget & Recurring Bill Form State
+  const [billTitle, setBillTitle] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [billWallet, setBillWallet] = useState('bkash');
+  const [budgetCat, setBudgetCat] = useState('Food & Meal');
+  const [budgetLimit, setBudgetLimit] = useState('');
+
   // Protected Safe Delete Modal
   const [showResetModal, setShowResetModal] = useState(false);
 
   const totalBalance = Object.values(wallets).reduce((sum, val) => sum + Number(val || 0), 0);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const currentMonthStr = todayStr.slice(0, 7);
-  const currentYearStr = todayStr.slice(0, 4);
+  const todayStr = getLocalDateStr();
+  const currentMonthStr = getLocalMonthStr();
+  const currentYearStr = getLocalYearStr();
 
-  // Compute Simultaneous All-Horizon Stats (Today, Week, Month, Year)
+  // Compute Simultaneous All-Horizon Stats (Today, Week, Month, Year) using local date diff
   const horizonStats = useMemo(() => {
-    const now = new Date();
     const res = {
       today: { in: 0, out: 0 },
       week: { in: 0, out: 0 },
@@ -72,14 +91,13 @@ export default function FinanceManager() {
       if (tx.category === 'Wallet Transfer') return;
       const amt = Number(tx.amount || 0);
       const isIncome = tx.type === 'in';
-      const txDate = new Date(tx.date);
-      const diffDays = (now - txDate) / (1000 * 60 * 60 * 24);
+      const diffDays = diffCalendarDays(todayStr, tx.date);
 
       if (tx.date === todayStr) {
         if (isIncome) res.today.in += amt;
         else res.today.out += amt;
       }
-      if (diffDays >= -0.5 && diffDays <= 7) {
+      if (diffDays >= 0 && diffDays <= 7) {
         if (isIncome) res.week.in += amt;
         else res.week.out += amt;
       }
@@ -96,6 +114,16 @@ export default function FinanceManager() {
     return res;
   }, [transactions, todayStr, currentMonthStr, currentYearStr]);
 
+  const monthCategorySpending = useMemo(() => {
+    const map = {};
+    transactions
+      .filter((t) => t.type === 'out' && t.category !== 'Wallet Transfer' && t.date.startsWith(currentMonthStr))
+      .forEach((t) => {
+        map[t.category] = (map[t.category] || 0) + Number(t.amount || 0);
+      });
+    return map;
+  }, [transactions, currentMonthStr]);
+
   // Yearly Income Source Breakdown
   const yearlyIncomeSources = useMemo(() => {
     const map = {};
@@ -108,14 +136,12 @@ export default function FinanceManager() {
   }, [transactions, currentYearStr]);
 
   const filteredTransactions = useMemo(() => {
-    const now = new Date();
     return transactions.filter((tx) => {
       if (selectedCalDate) return tx.date === selectedCalDate;
       if (timeFilter === 'today') return tx.date === todayStr;
       if (timeFilter === 'week') {
-        const txDate = new Date(tx.date);
-        const diffDays = (now - txDate) / (1000 * 60 * 60 * 24);
-        return diffDays >= -0.5 && diffDays <= 7;
+        const diffDays = diffCalendarDays(todayStr, tx.date);
+        return diffDays >= 0 && diffDays <= 7;
       }
       if (timeFilter === 'month') return tx.date.slice(0, 7) === currentMonthStr;
       if (timeFilter === 'year') return tx.date.slice(0, 4) === currentYearStr;
@@ -894,6 +920,148 @@ export default function FinanceManager() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Monthly Category Budgets & Recurring Bills */}
+      <div className="grid lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7 glass-crystal rounded-3xl p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-white">
+              <Gauge className="w-4 h-4 text-cyan-400" />
+              <span>মাসিক বাজেট লিমিট ও সতর্কতা ({currentMonthStr})</span>
+            </h3>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            {Object.entries(budgets).map(([cat, lim]) => {
+              const spent = monthCategorySpending[cat] || 0;
+              const pct = lim > 0 ? Math.round((spent / lim) * 100) : 0;
+              const over = pct >= 100;
+              const warn = pct >= 80 && !over;
+              return (
+                <div key={cat} className="p-3.5 rounded-2xl bg-slate-950/60 border border-white/10 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white">{cat}</span>
+                    <span className={`font-mono font-bold ${over ? 'text-rose-400' : warn ? 'text-amber-300' : 'text-emerald-300'}`}>
+                      ৳{spent.toLocaleString()} / ৳{Number(lim).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${over ? 'bg-rose-500' : warn ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-400 flex justify-between">
+                    <span>{pct}% ব্যবহৃত</span>
+                    {over && <span className="text-rose-400 font-bold">বাজেট অতিক্রম করেছে!</span>}
+                    {warn && <span className="text-amber-300 font-bold">বাজেট প্রায় শেষ</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!budgetLimit) return;
+              SoundFX.success();
+              setCategoryBudget(budgetCat, budgetLimit);
+              setBudgetLimit('');
+            }}
+            className="flex flex-wrap gap-2 pt-2 border-t border-white/10"
+          >
+            <select
+              value={budgetCat}
+              onChange={(e) => setBudgetCat(e.target.value)}
+              className="px-3 py-2 rounded-xl glass-input text-xs"
+            >
+              {expenseCategories.map((c) => (
+                <option key={c} value={c} className="bg-slate-900">{c}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              placeholder="নতুন বাজেট সীমা (৳)"
+              value={budgetLimit}
+              onChange={(e) => setBudgetLimit(e.target.value)}
+              className="flex-1 min-w-[140px] px-3 py-2 rounded-xl glass-input text-xs"
+            />
+            <button type="submit" className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold">
+              Set Limit
+            </button>
+          </form>
+        </div>
+
+        <div className="lg:col-span-5 glass-crystal rounded-3xl p-5 space-y-4">
+          <h3 className="font-bold text-sm flex items-center gap-2 text-white border-b border-white/10 pb-3">
+            <Repeat className="w-4 h-4 text-emerald-400" />
+            <span>Recurring Bills (১-ক্লিক মাসিক বিল)</span>
+          </h3>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!billTitle || !billAmount) return;
+              SoundFX.success();
+              addRecurringBill({ title: billTitle, amount: billAmount, wallet: billWallet, category: 'Other' });
+              setBillTitle('');
+              setBillAmount('');
+            }}
+            className="grid grid-cols-3 gap-2"
+          >
+            <input
+              type="text"
+              placeholder="বিল (e.g. Hall Fee)"
+              value={billTitle}
+              onChange={(e) => setBillTitle(e.target.value)}
+              className="px-3 py-2 rounded-xl glass-input text-xs"
+            />
+            <input
+              type="number"
+              placeholder="৳"
+              value={billAmount}
+              onChange={(e) => setBillAmount(e.target.value)}
+              className="px-3 py-2 rounded-xl glass-input text-xs"
+            />
+            <button type="submit" className="py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold">
+              + Add Bill
+            </button>
+          </form>
+
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {recurringBills.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-4">হল ফি, জিম বা ওয়াইফাই বিল এখানে সেভ করুন।</p>
+            ) : (
+              recurringBills.map((b) => (
+                <div key={b.id} className="p-3 rounded-2xl bg-slate-950/60 border border-white/10 flex items-center justify-between text-xs">
+                  <div>
+                    <p className="font-bold text-white">{b.title}</p>
+                    <span className="text-[10px] font-mono text-slate-400">৳{b.amount} • {b.wallet}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        SoundFX.success();
+                        logRecurringBill(b.id);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[11px] font-bold transition"
+                    >
+                      Pay Now
+                    </button>
+                    <button
+                      onClick={() => deleteRecurringBill(b.id)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-600 text-slate-400 hover:text-white"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 

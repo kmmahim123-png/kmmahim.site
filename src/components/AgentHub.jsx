@@ -1,30 +1,38 @@
 import React, { useState } from 'react';
 import { useOS } from '../context/OSContext';
+import { getLocalDateStr } from '../utils/dateUtils';
+import { SoundFX } from './common/SoundEffects';
 import {
-  Bot, Cpu, Terminal, Sparkles, Key, ShieldCheck, Send,
-  Smartphone, Download, Upload, Zap
+  Bot, Cpu, Terminal, Key, Send, Smartphone, Download, Zap
 } from 'lucide-react';
 
 export default function AgentHub() {
-  const { data, setData, dispatchAgentCommand, updateAgentConfig } = useOS();
+  const { data, dispatchAgentCommand, updateAgentConfig } = useOS();
   const { agents } = data;
 
   const [selectedBot, setSelectedBot] = useState('Broker Orchestrator');
   const [commandInput, setCommandInput] = useState('');
   const [webhookInput, setWebhookInput] = useState(agents.webhookUrl || '');
+  const [busy, setBusy] = useState(false);
 
-  const handleSendCommand = (e) => {
+  const handleSendCommand = async (e) => {
     e.preventDefault();
-    if (!commandInput.trim()) return;
-    dispatchAgentCommand(selectedBot, commandInput);
+    if (!commandInput.trim() || busy) return;
+    setBusy(true);
+    await dispatchAgentCommand(selectedBot, commandInput.trim());
+    SoundFX.success();
     setCommandInput('');
+    setBusy(false);
   };
 
-  const handleGenerateDailyRoutine = () => {
-    dispatchAgentCommand(
+  const handleGenerateDailyRoutine = async () => {
+    setBusy(true);
+    await dispatchAgentCommand(
       'Broker Orchestrator',
-      'Morning Routine: 1) Gym Workout + Minoxidil, 2) 2 Pomodoro Study Blocks, 3) Approve OpenClaw Social Post'
+      'Morning Routine: 1) Gym Workout + Minoxidil, 2) 2 Pomodoro Study Blocks, 3) Review Goals'
     );
+    SoundFX.success();
+    setBusy(false);
   };
 
   const handleExportBackup = () => {
@@ -32,29 +40,31 @@ export default function AgentHub() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `KM_Mahim_OS_Sync_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `KM_Mahim_OS_Sync_${getLocalDateStr()}.json`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2.5">
-            <Bot className="w-6 h-6 text-indigo-400"/>
-            <span>AI Agent Command Center (OpenClaw • Grok • Hermes)</span>
+          <h1 className="text-xl sm:text-2xl font-black flex items-center gap-2.5 text-white">
+            <Bot className="w-6 h-6 text-indigo-400" />
+            <span>Automation Webhook Bridge (OpenClaw • n8n • Make)</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Control your autonomous agents, assign daily tasks, configure webhooks, and sync with your Android APK
+            আপনার আসল n8n/OpenClaw Webhook URL যুক্ত করলে এখান থেকে রিমোট অটোমেশন ও ডেইলি গোল একসাথে চলবে
           </p>
         </div>
 
         <button
           onClick={handleGenerateDailyRoutine}
+          disabled={busy}
           className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-xs font-semibold text-white flex items-center gap-2 shadow-lg shadow-indigo-600/20"
         >
-          <Zap className="w-4 h-4"/>
-          <span>Ask Broker Agent for Today’s Tasks</span>
+          <Zap className="w-4 h-4" />
+          <span>Add Daily Sprint Tasks</span>
         </button>
       </div>
 
@@ -64,33 +74,33 @@ export default function AgentHub() {
           <div
             key={bot.id}
             onClick={() => setSelectedBot(bot.name)}
-            className={`p-4 rounded-2xl border cursor-pointer transition ${
+            className={`p-4 rounded-3xl border cursor-pointer transition ${
               selectedBot === bot.name
-                ? 'bg-indigo-950/50 border-indigo-500'
-                : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                ? 'glass-crystal border-indigo-500 bg-indigo-950/30'
+                : 'glass-crystal hover:border-white/25'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 ● {bot.status}
               </span>
-              <Cpu className="w-4 h-4 text-cyan-400"/>
+              <Cpu className="w-4 h-4 text-cyan-400" />
             </div>
             <h3 className="font-bold text-sm text-white">{bot.name}</h3>
             <p className="text-[11px] text-slate-400 mt-1">{bot.role}</p>
-            <p className="text-[10px] text-indigo-300 font-mono mt-3 pt-2 border-t border-slate-800/80">
+            <p className="text-[10px] text-indigo-300 font-mono mt-3 pt-2 border-t border-white/10">
               Last: {bot.lastTask}
             </p>
           </div>
         ))}
       </div>
 
-      {/* Command Dispatch + Live Logs */}
+      {/* Command Dispatch + Webhook Bridge */}
       <div className="grid lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-7 bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <h3 className="font-bold text-sm flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-emerald-400"/>
-            <span>Direct Agent Command Terminal</span>
+        <div className="lg:col-span-7 glass-crystal rounded-3xl p-5 space-y-4">
+          <h3 className="font-bold text-sm flex items-center gap-2 text-white">
+            <Terminal className="w-4 h-4 text-emerald-400" />
+            <span>Webhook & Task Command Terminal</span>
           </h3>
 
           <form onSubmit={handleSendCommand} className="space-y-3">
@@ -98,42 +108,43 @@ export default function AgentHub() {
               <select
                 value={selectedBot}
                 onChange={(e) => setSelectedBot(e.target.value)}
-                className="px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-indigo-300 font-semibold"
+                className="px-3 py-2.5 rounded-xl glass-input text-xs text-indigo-300 font-semibold"
               >
-                <option value="Broker Orchestrator">Broker Orchestrator</option>
-                <option value="OpenClaw Agent">OpenClaw Agent</option>
-                <option value="Grok Research Bot">Grok Research Bot</option>
-                <option value="Hermes Logic Agent">Hermes Logic Agent</option>
+                <option value="Broker Orchestrator" className="bg-slate-900">Broker Orchestrator</option>
+                <option value="OpenClaw Agent" className="bg-slate-900">OpenClaw Agent</option>
+                <option value="Grok Research Bot" className="bg-slate-900">Grok Research Bot</option>
+                <option value="Hermes Logic Agent" className="bg-slate-900">Hermes Logic Agent</option>
               </select>
 
               <input
                 type="text"
-                placeholder="Give a command (e.g. Research viral fitness reels & add to daily goal)..."
+                placeholder="Give a command to webhook + daily goals..."
                 value={commandInput}
                 onChange={(e) => setCommandInput(e.target.value)}
-                className="sm:col-span-2 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
+                className="sm:col-span-2 px-3.5 py-2.5 rounded-xl glass-input text-xs"
               />
             </div>
 
             <button
               type="submit"
+              disabled={busy}
               className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white flex items-center justify-center gap-2"
             >
-              <Send className="w-3.5 h-3.5"/>
-              <span>Execute Command & Sync with Daily Goals</span>
+              <Send className="w-3.5 h-3.5" />
+              <span>{busy ? 'Dispatching...' : 'Execute Webhook & Add Goal'}</span>
             </button>
           </form>
 
           {/* Activity Log */}
-          <div className="pt-3 border-t border-slate-800 space-y-2">
+          <div className="pt-3 border-t border-white/10 space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
-              Live Agent Execution Logs
+              Execution Logs
             </span>
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
               {(agents.logs || []).map((log) => (
                 <div
                   key={log.id}
-                  className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 text-xs flex items-center justify-between gap-2"
+                  className="p-2.5 rounded-xl bg-slate-950/70 border border-white/10 text-xs flex items-center justify-between gap-2"
                 >
                   <div>
                     <span className="font-bold text-cyan-400">[{log.agent}]</span>{' '}
@@ -148,10 +159,10 @@ export default function AgentHub() {
 
         {/* Webhook Gateway & APK Mobile Sync */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
-            <h3 className="font-bold text-sm flex items-center gap-2">
-              <Key className="w-4 h-4 text-amber-400"/>
-              <span>OpenClaw / n8n Webhook & API Bridge</span>
+          <div className="glass-crystal rounded-3xl p-5 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-white">
+              <Key className="w-4 h-4 text-amber-400" />
+              <span>Real OpenClaw / n8n Webhook Bridge</span>
             </h3>
 
             <div>
@@ -161,11 +172,14 @@ export default function AgentHub() {
                   type="text"
                   value={webhookInput}
                   onChange={(e) => setWebhookInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300"
+                  className="flex-1 px-3 py-2 rounded-xl glass-input text-xs font-mono"
                 />
                 <button
                   type="button"
-                  onClick={() => updateAgentConfig({ webhookUrl: webhookInput })}
+                  onClick={() => {
+                    updateAgentConfig({ webhookUrl: webhookInput });
+                    SoundFX.success();
+                  }}
                   className="px-3 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white"
                 >
                   Save
@@ -174,26 +188,23 @@ export default function AgentHub() {
             </div>
 
             <div className="flex items-center justify-between pt-2 text-xs">
-              <span className="text-slate-400">Secret Agent API Key:</span>
-              <code className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 text-cyan-300 font-mono">
+              <span className="text-slate-400">Header X-Agent-Key:</span>
+              <code className="px-2.5 py-1 rounded bg-slate-950 border border-white/10 text-cyan-300 font-mono">
                 {agents.apiKey}
               </code>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-indigo-950/50 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 space-y-3">
-            <h3 className="font-bold text-sm flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-cyan-400"/>
-              <span>Mobile APK & Cloud Data Backup</span>
+          <div className="glass-crystal rounded-3xl p-5 space-y-3">
+            <h3 className="font-bold text-sm flex items-center gap-2 text-white">
+              <Smartphone className="w-4 h-4 text-cyan-400" />
+              <span>JSON Backup Export</span>
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Your Website and Android APK share the same OS structure. Export or sync your JSON database anytime.
-            </p>
             <button
               onClick={handleExportBackup}
-              className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-700 text-xs font-semibold text-cyan-300 flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-900 border border-white/10 text-xs font-semibold text-cyan-300 flex items-center justify-center gap-2"
             >
-              <Download className="w-4 h-4"/>
+              <Download className="w-4 h-4" />
               <span>Download Full Life OS Backup (.json)</span>
             </button>
           </div>

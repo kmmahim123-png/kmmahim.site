@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import { getLocalDateStr } from '../utils/dateUtils';
 import SafeDeleteModal from './common/SafeDeleteModal';
 import { SoundFX } from './common/SoundEffects';
 import {
@@ -20,7 +21,7 @@ export default function MealManager() {
 
   const { mode, ratePerMeal, packageTotalMeals, deposits, logs } = data.meals;
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = getLocalDateStr();
   const [selectedDate, setSelectedDate] = useState(todayKey);
 
   // Deposit Form State

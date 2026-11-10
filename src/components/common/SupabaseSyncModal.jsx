@@ -64,7 +64,27 @@ USING (true)
 WITH CHECK (true);
 
 -- Enable instant Laptop <-> Mobile Realtime Sync
-ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;
+
+-- Safe Public Contact Form Inbox Table (Visitors can insert without touching primary_os)
+CREATE TABLE IF NOT EXISTS public.public_inquiries (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  sender text NOT NULL,
+  email text NOT NULL,
+  service text,
+  meeting_date text,
+  text text,
+  created_at timestamptz DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE public.public_inquiries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public inquiry access" ON public.public_inquiries;
+CREATE POLICY "Allow public inquiry access"
+ON public.public_inquiries
+FOR ALL
+USING (true)
+WITH CHECK (true);`;
 
   const handleCopySql = () => {
     SoundFX.click();

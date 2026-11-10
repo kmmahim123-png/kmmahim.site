@@ -3,8 +3,22 @@ import {
   uploadLifeOSData,
   fetchLifeOSData,
   testSupabaseConnection,
-  subscribeToLifeOS
+  subscribeToLifeOS,
+  submitPublicInquiry,
+  fetchPublicInquiries,
+  deletePublicInquiry
 } from '../services/supabaseClient';
+import { getLocalDateStr } from '../utils/dateUtils';
+import {
+  listGmailMessages,
+  sendGmailMessage,
+  listCalendarEvents,
+  createCalendarEvent,
+  listGoogleContacts,
+  fetchYouTubeVideos
+} from '../services/googleIntegrations';
+import { sendWhatsAppMessage } from '../services/whatsappService';
+import { SoundFX } from '../components/common/SoundEffects';
 
 const OSContext = createContext();
 
@@ -166,15 +180,53 @@ const INITIAL_DATA = {
     logs: [
       { id: "l1", agent: "Broker Orchestrator", text: "Initialized Layer-2 API Bridge for Web & Android APK.", time: "Just now" }
     ]
+  },
+  secondBrain: {
+    notes: [
+      {
+        id: "sb1",
+        title: "JACKFRU Retail Strategy",
+        folder: "Projects",
+        tags: ["Apparel", "Business"],
+        content: "# JACKFRU Launch Blueprint\n- Focus on quality stitching & packaging.\n- Connect with [[Autonomous Life OS]] for cashflow tracking.",
+        pinned: true,
+        updatedAt: "2026-11-09"
+      },
+      {
+        id: "sb2",
+        title: "Autonomous Life OS Architecture",
+        folder: "Areas",
+        tags: ["AI", "SecondBrain"],
+        content: "Unified Second Brain combining [[JACKFRU Retail Strategy]], Sports Science notes, and AI Tool-Calling.",
+        pinned: false,
+        updatedAt: "2026-11-09"
+      }
+    ],
+    journal: {},
+    flashcards: [
+      {
+        id: "fc1",
+        topic: "Sports Science",
+        front: "What is VO2 Max?",
+        back: "Maximum rate of oxygen consumption measured during incremental exercise (ml/kg/min).",
+        mastery: 1,
+        nextReview: "2026-11-10"
+      }
+    ]
+  },
+  budgets: {
+    "Food & Meal": 4000,
+    "Transport & Varsity": 1500,
+    "Tech & AI APIs": 1500,
+    "Personal & Care": 1500
+  },
+  recurringBills: [],
+  customSections: [],
+  mediaVault: {
+    channelPlaylists: [],
+    savedVideos: [],
+    audioTracks: []
   }
-};
-
-// Helper: Local YYYY-MM-DD
-const getLocalDateStr = (d = new Date()) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 };
 
 // Helper: Current cycle keys for Daily (12 AM), Weekly (Friday Reset), Monthly (Month End), Yearly (Dec 31)
@@ -242,13 +294,26 @@ const hasUntouchedDemoOnly = (state) => {
   );
 };
 
+const UNLOCK_UNTIL_KEY = 'KM_MAHIM_UNLOCK_UNTIL';
+const ACTIVE_LAYER_KEY = 'KM_MAHIM_ACTIVE_LAYER';
+const SECRET_CONFIG_KEY = 'KM_MAHIM_SECRET_CONFIG_V1';
+
 const normalizeOSState = (incoming, fallback = INITIAL_DATA) => {
   if (!incoming || typeof incoming !== 'object') return fallback;
   return {
     ...INITIAL_DATA,
     ...fallback,
     ...incoming,
-    profile: { ...INITIAL_DATA.profile, ...(fallback.profile || {}), ...(incoming.profile || {}) },
+    profile: {
+      ...INITIAL_DATA.profile,
+      ...(fallback.profile || {}),
+      ...(incoming.profile || {}),
+      socials: {
+        ...INITIAL_DATA.profile.socials,
+        ...(fallback.profile?.socials || {}),
+        ...(incoming.profile?.socials || {})
+      }
+    },
     finance: { ...INITIAL_DATA.finance, ...(fallback.finance || {}), ...(incoming.finance || {}) },
     meals: { ...INITIAL_DATA.meals, ...(fallback.meals || {}), ...(incoming.meals || {}) },
     habits: {
@@ -263,6 +328,36 @@ const normalizeOSState = (incoming, fallback = INITIAL_DATA) => {
       ...(incoming.agents || {}),
       bots: incoming.agents?.bots?.length ? incoming.agents.bots : INITIAL_DATA.agents.bots,
       logs: incoming.agents?.logs?.length ? incoming.agents.logs : INITIAL_DATA.agents.logs
+    },
+    secondBrain: {
+      notes: incoming.secondBrain?.notes || fallback.secondBrain?.notes || INITIAL_DATA.secondBrain.notes,
+      journal: {
+        ...(INITIAL_DATA.secondBrain.journal || {}),
+        ...(fallback.secondBrain?.journal || {}),
+        ...(incoming.secondBrain?.journal || {})
+      },
+      flashcards:
+        incoming.secondBrain?.flashcards ||
+        fallback.secondBrain?.flashcards ||
+        INITIAL_DATA.secondBrain.flashcards
+    },
+    budgets: {
+      ...INITIAL_DATA.budgets,
+      ...(fallback.budgets || {}),
+      ...(incoming.budgets || {})
+    },
+    recurringBills:
+      incoming.recurringBills || fallback.recurringBills || INITIAL_DATA.recurringBills,
+    customSections:
+      incoming.customSections || fallback.customSections || INITIAL_DATA.customSections,
+    mediaVault: {
+      ...INITIAL_DATA.mediaVault,
+      ...(fallback.mediaVault || {}),
+      ...(incoming.mediaVault || {}),
+      channelPlaylists:
+        incoming.mediaVault?.channelPlaylists || fallback.mediaVault?.channelPlaylists || [],
+      savedVideos: incoming.mediaVault?.savedVideos || fallback.mediaVault?.savedVideos || [],
+      audioTracks: incoming.mediaVault?.audioTracks || fallback.mediaVault?.audioTracks || []
     }
   };
 };
@@ -329,6 +424,34 @@ const smartMergeOSData = (localState, remoteState) => {
       ...(remoteState.agents || {}),
       ...(localState.agents || {}),
       logs: mergeArraysById(localState.agents?.logs, remoteState.agents?.logs).slice(0, 40)
+    },
+    secondBrain: {
+      notes: mergeArraysById(localState.secondBrain?.notes, remoteState.secondBrain?.notes),
+      journal: {
+        ...(remoteState.secondBrain?.journal || {}),
+        ...(localState.secondBrain?.journal || {})
+      },
+      flashcards: mergeArraysById(
+        localState.secondBrain?.flashcards,
+        remoteState.secondBrain?.flashcards
+      )
+    },
+    budgets: { ...(remoteState.budgets || {}), ...(localState.budgets || {}) },
+    recurringBills: mergeArraysById(localState.recurringBills, remoteState.recurringBills),
+    customSections: mergeArraysById(localState.customSections, remoteState.customSections),
+    mediaVault: {
+      channelPlaylists: mergeArraysById(
+        localState.mediaVault?.channelPlaylists,
+        remoteState.mediaVault?.channelPlaylists
+      ),
+      savedVideos: mergeArraysById(
+        localState.mediaVault?.savedVideos,
+        remoteState.mediaVault?.savedVideos
+      ),
+      audioTracks: mergeArraysById(
+        localState.mediaVault?.audioTracks,
+        remoteState.mediaVault?.audioTracks
+      )
     }
   });
 };
@@ -345,7 +468,7 @@ export const OSProvider = ({ children }) => {
       const savedStamps = parsed.goalCycleStamps || {};
       let goals = parsed.goals || INITIAL_DATA.goals;
 
-      // Auto-reset completed flags when a cycle (Daily midnight, Weekly Friday, Monthly end, Yearly end) rolls over
+      // Auto-reset completed flags when a cycle rolls over
       goals = goals.map((g) => {
         const tf = g.timeframe || 'daily';
         if (savedStamps[tf] && savedStamps[tf] !== cycles[tf] && g.completed) {
@@ -354,36 +477,223 @@ export const OSProvider = ({ children }) => {
         return g;
       });
 
-      return {
-        ...INITIAL_DATA,
+      return normalizeOSState({
         ...parsed,
-        profile: { ...INITIAL_DATA.profile, ...(parsed.profile || {}) },
-        finance: { ...INITIAL_DATA.finance, ...(parsed.finance || {}) },
-        meals: { ...INITIAL_DATA.meals, ...(parsed.meals || {}) },
-        habits: {
-          ...INITIAL_DATA.habits,
-          ...(parsed.habits || {}),
-          customHabits: parsed.habits?.customHabits || []
-        },
         goalCycleStamps: cycles,
         goals,
-        ideas: parsed.ideas || INITIAL_DATA.ideas,
-        socialQueue: parsed.socialQueue?.length ? parsed.socialQueue : INITIAL_DATA.socialQueue,
-        agents: {
-          ...INITIAL_DATA.agents,
-          ...(parsed.agents || {}),
-          bots: parsed.agents?.bots?.length ? parsed.agents.bots : INITIAL_DATA.agents.bots,
-          logs: parsed.agents?.logs?.length ? parsed.agents.logs : INITIAL_DATA.agents.logs
-        }
-      };
+        socialQueue: parsed.socialQueue?.length ? parsed.socialQueue : INITIAL_DATA.socialQueue
+      });
     } catch {
       return { ...INITIAL_DATA, goalCycleStamps: cycles };
     }
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeLayer, setActiveLayer] = useState('public');
+  // Persistent Trusted Device Session (survives reload until Lock OS or expiry!)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const until = Number(localStorage.getItem(UNLOCK_UNTIL_KEY) || 0);
+    return until > Date.now();
+  });
+  const [activeLayer, setActiveLayerState] = useState(() => {
+    const until = Number(localStorage.getItem(UNLOCK_UNTIL_KEY) || 0);
+    if (until > Date.now() && localStorage.getItem(ACTIVE_LAYER_KEY) === 'private') {
+      return 'private';
+    }
+    return 'public';
+  });
   const [showPinModal, setShowPinModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const setActiveLayer = (nextLayer) => {
+    const resolved = typeof nextLayer === 'function' ? nextLayer(activeLayer) : nextLayer;
+    localStorage.setItem(ACTIVE_LAYER_KEY, resolved);
+    setActiveLayerState(resolved);
+  };
+
+  // Device-Local Secret Config (API Keys, OAuth Client ID, Meta Tokens — kept out of public cloud row)
+  const [secretConfig, setSecretConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SECRET_CONFIG_KEY);
+      return raw
+        ? JSON.parse(raw)
+        : {
+            aiProvider: 'gemini',
+            aiModel: '',
+            aiApiKey: '',
+            rememberDays: 7,
+            googleClientId: '',
+            youtubeApiKey: '',
+            metaWaToken: '',
+            metaWaPhoneId: '',
+            whatsappWebhookUrl: ''
+          };
+    } catch {
+      return {
+        aiProvider: 'gemini',
+        aiModel: '',
+        aiApiKey: '',
+        rememberDays: 7,
+        googleClientId: '',
+        youtubeApiKey: '',
+        metaWaToken: '',
+        metaWaPhoneId: '',
+        whatsappWebhookUrl: ''
+      };
+    }
+  });
+
+  const updateSecretConfig = (patch) => {
+    setSecretConfig((prev) => {
+      const next = { ...prev, ...patch };
+      localStorage.setItem(SECRET_CONFIG_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Ephemeral Google OAuth Token + Cached Live Feeds
+  const [googleSession, setGoogleSession] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('KM_MAHIM_GOOGLE_TOKEN');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.expiresAt > Date.now()) return parsed;
+      }
+    } catch {}
+    return { accessToken: '', expiresAt: 0, scope: '' };
+  });
+
+  const saveGoogleSession = (sess) => {
+    setGoogleSession(sess);
+    try {
+      if (sess?.accessToken) {
+        sessionStorage.setItem('KM_MAHIM_GOOGLE_TOKEN', JSON.stringify(sess));
+      } else {
+        sessionStorage.removeItem('KM_MAHIM_GOOGLE_TOKEN');
+      }
+    } catch {}
+  };
+
+  const [integrationFeeds, setIntegrationFeeds] = useState({
+    emails: [],
+    events: [],
+    contacts: [],
+    youtubeVideos: [],
+    youtubeChannelTitle: ''
+  });
+
+  // Global Pomodoro Focus Timer (persists across tab switches!)
+  const [pomodoro, setPomodoro] = useState({
+    customMinutes: 25,
+    totalSessionSecs: 25 * 60,
+    timeLeft: 25 * 60,
+    isRunning: false,
+    mode: 'work',
+    finishedNotice: ''
+  });
+
+  useEffect(() => {
+    if (!pomodoro.isRunning) return;
+    const id = setInterval(() => {
+      setPomodoro((prev) => {
+        if (!prev.isRunning) return prev;
+        if (prev.timeLeft <= 1) {
+          SoundFX.success();
+          const msg =
+            prev.mode === 'work'
+              ? 'ফোকাস সেশন সম্পন্ন হয়েছে! একটু বিরতি নিন।'
+              : 'বিরতি শেষ! আবার কাজে মনোযোগ দিন।';
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            try {
+              new Notification('KM Mahim Focus Timer', { body: msg });
+            } catch {}
+          }
+          return { ...prev, timeLeft: 0, isRunning: false, finishedNotice: msg };
+        }
+        return { ...prev, timeLeft: prev.timeLeft - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [pomodoro.isRunning]);
+
+  const applyPomodoroPreset = (mins, mode = 'work') => {
+    const cleanMins = Math.max(1, Math.min(240, Number(mins) || 25));
+    setPomodoro({
+      customMinutes: cleanMins,
+      totalSessionSecs: cleanMins * 60,
+      timeLeft: cleanMins * 60,
+      isRunning: false,
+      mode,
+      finishedNotice: ''
+    });
+  };
+
+  const togglePomodoroRun = () => {
+    setPomodoro((prev) => ({ ...prev, isRunning: !prev.isRunning, finishedNotice: '' }));
+  };
+
+  const dismissPomodoroNotice = () => {
+    setPomodoro((prev) => ({ ...prev, finishedNotice: '' }));
+  };
+
+  // Persistent Background Audio Player (works across tabs & supports MediaSession lock-screen controls)
+  const audioElRef = useRef(null);
+  const [audioPlayer, setAudioPlayer] = useState({
+    currentTrack: null,
+    isPlaying: false
+  });
+
+  const playAudioTrack = (track) => {
+    if (!track?.url) return;
+    setAudioPlayer({ currentTrack: track, isPlaying: true });
+    setTimeout(() => {
+      if (audioElRef.current) {
+        audioElRef.current.src = track.url;
+        audioElRef.current.play().catch(() => {});
+      }
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title || 'KM Mahim Audio',
+            artist: track.artist || 'KM Mahim Media Vault'
+          });
+          navigator.mediaSession.setActionHandler('play', () => audioElRef.current?.play());
+          navigator.mediaSession.setActionHandler('pause', () => audioElRef.current?.pause());
+        } catch {}
+      }
+    }, 20);
+  };
+
+  const toggleAudioPlayPause = () => {
+    if (!audioElRef.current || !audioPlayer.currentTrack) return;
+    if (audioElRef.current.paused) {
+      audioElRef.current.play().catch(() => {});
+      setAudioPlayer((p) => ({ ...p, isPlaying: true }));
+    } else {
+      audioElRef.current.pause();
+      setAudioPlayer((p) => ({ ...p, isPlaying: false }));
+    }
+  };
+
+  const stopAudioTrack = () => {
+    if (audioElRef.current) {
+      audioElRef.current.pause();
+      audioElRef.current.removeAttribute('src');
+    }
+    setAudioPlayer({ currentTrack: null, isPlaying: false });
+  };
+
+  // AI Copilot State (Session conversations + Right-Side Claude Artifact Preview)
+  const [aiMessages, setAiMessages] = useState([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content:
+        'স্বাগতম! আমি আপনার **Mahim AI Copilot**। উপরে শুধু আপনার Gemini / OpenAI / Claude / Groq API Key বসিয়ে বলুন—যেমন: *"আজ রিকশা ৫০৳ খরচ, দুপুর ১টা মিল, আর বই পড়ার গোল অ্যাড করো"* অথবা *"আমার জিমেইল/ক্যালেন্ডার চেক করো"* অথবা *"YouTube নোটস নামে নতুন সেকশন বানাও"*।',
+      actions: [],
+      artifact: null
+    }
+  ]);
+  const [activeArtifact, setActiveArtifact] = useState(null);
+  const [showCopilotDrawer, setShowCopilotDrawer] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('KM_MAHIM_LIFE_OS_V1', JSON.stringify(data));
@@ -394,7 +704,7 @@ export const OSProvider = ({ children }) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         if (isAuthenticated) {
-          setActiveLayer(prev => (prev === 'public' ? 'private' : 'public'));
+          setActiveLayer((prev) => (prev === 'public' ? 'private' : 'public'));
         } else {
           setShowPinModal(true);
         }
@@ -402,16 +712,33 @@ export const OSProvider = ({ children }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, activeLayer]);
 
   const verifyPin = (inputPin) => {
     if (inputPin === data.profile.pin) {
+      const days = Math.max(0, Number(secretConfig.rememberDays ?? 7));
+      if (days > 0) {
+        localStorage.setItem(UNLOCK_UNTIL_KEY, String(Date.now() + days * 24 * 60 * 60 * 1000));
+      } else {
+        localStorage.setItem(UNLOCK_UNTIL_KEY, String(Date.now() + 12 * 60 * 60 * 1000));
+      }
+      localStorage.setItem(ACTIVE_LAYER_KEY, 'private');
       setIsAuthenticated(true);
-      setActiveLayer('private');
+      setActiveLayerState('private');
       setShowPinModal(false);
       return true;
     }
     return false;
+  };
+
+  const isAuthRef = useRef(isAuthenticated);
+  isAuthRef.current = isAuthenticated;
+
+  const lockOS = () => {
+    localStorage.removeItem(UNLOCK_UNTIL_KEY);
+    localStorage.setItem(ACTIVE_LAYER_KEY, 'public');
+    setIsAuthenticated(false);
+    setActiveLayerState('public');
   };
 
   // Supabase Cloud Sync State & Actions
@@ -628,7 +955,7 @@ export const OSProvider = ({ children }) => {
           data: null
         });
         const hasPending = localStorage.getItem(PENDING_UPLOAD_KEY) === '1';
-        if (hasPending || !hasUntouchedDemoOnly(dataRef.current)) {
+        if (isAuthRef.current && (hasPending || !hasUntouchedDemoOnly(dataRef.current))) {
           await uploadToSupabase(dataRef.current);
         } else {
           setSyncStatus({
@@ -670,12 +997,18 @@ export const OSProvider = ({ children }) => {
           message: 'অন্য ডিভাইসের লেটেস্ট ডেটা সিঙ্ক হয়েছে! ☁️'
         });
       } else if (hasPending && lastCloudSync > 0 && remoteTime <= lastCloudSync) {
-        await uploadToSupabase(dataRef.current);
+        if (isAuthRef.current) {
+          await uploadToSupabase(dataRef.current);
+        }
       } else if ((hasPending || !lastCloudSync) && remoteTime > lastCloudSync) {
-        // Both devices hold distinct real updates -> merge cleanly without losing either!
-        const merged = smartMergeOSData(dataRef.current, result.data);
-        applyRemoteData(merged, result.timestamp);
-        await uploadToSupabase(merged);
+        if (isAuthRef.current) {
+          // Both devices hold distinct real updates -> merge cleanly without losing either!
+          const merged = smartMergeOSData(dataRef.current, result.data);
+          applyRemoteData(merged, result.timestamp);
+          await uploadToSupabase(merged);
+        } else {
+          applyRemoteData(result.data, result.timestamp);
+        }
       } else {
         localStorage.setItem(LAST_CLOUD_SYNC_KEY, result.timestamp);
         setSyncStatus({
@@ -729,13 +1062,14 @@ export const OSProvider = ({ children }) => {
     };
   }, []);
 
-  // Auto-sync debounce on local user edits
+  // Auto-sync debounce ONLY when owner is authenticated (prevents visitor edits overwriting primary_os)
   useEffect(() => {
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
       return;
     }
     if (isApplyingRemoteRef.current) return;
+    if (!isAuthenticated) return;
 
     localStorage.setItem(PENDING_UPLOAD_KEY, '1');
 
@@ -744,7 +1078,23 @@ export const OSProvider = ({ children }) => {
       uploadToSupabase(dataRef.current);
     }, 1200);
     return () => clearTimeout(timeout);
-  }, [data, autoSync]);
+  }, [data, autoSync, isAuthenticated]);
+
+  // Public Inquiries Queue synced safely from Supabase public_inquiries table
+  const [publicInquiries, setPublicInquiries] = useState([]);
+  const loadPublicInquiries = async () => {
+    const res = await fetchPublicInquiries();
+    if (res.success) {
+      setPublicInquiries(res.items);
+    }
+    return res;
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadPublicInquiries();
+    }
+  }, [isAuthenticated]);
 
   // Part 1 Actions
   const updateProfile = (newProfile) => {
@@ -765,21 +1115,30 @@ export const OSProvider = ({ children }) => {
     }));
   };
 
-  const sendClientMessage = (msg) => {
-    setData(prev => ({
-      ...prev,
-      messages: [{ ...msg, id: 'msg_' + Date.now(), date: new Date().toLocaleString(), type: 'client', read: false }, ...prev.messages]
-    }));
+  const sendClientMessage = async (msg) => {
+    const cloudRes = await submitPublicInquiry(msg);
+    // Keep lightweight local confirmation for immediate UI feedback without mutating cloud primary_os
+    if (isAuthenticated) {
+      setData(prev => ({
+        ...prev,
+        messages: [{ ...msg, id: 'msg_' + Date.now(), date: new Date().toLocaleString(), type: 'client', read: false }, ...prev.messages]
+      }));
+    }
+    return cloudRes;
   };
 
-  const deleteMessage = (msgId) => {
+  const deleteMessage = async (msgId, dbId = null) => {
+    if (dbId) {
+      await deletePublicInquiry(dbId);
+      setPublicInquiries(prev => prev.filter(m => m.id !== msgId));
+    }
     setData(prev => ({
       ...prev,
       messages: prev.messages.filter(m => m.id !== msgId)
     }));
   };
 
-  // Part 2 Actions — Practical Finance & Wallet Editing
+  // Part 2 Actions — Practical Finance, Budgets & Recurring Bills
   const setWalletBalance = (walletKey, newAmount) => {
     const val = Math.max(0, Number(newAmount) || 0);
     setData(prev => ({
@@ -797,7 +1156,7 @@ export const OSProvider = ({ children }) => {
     setData(prev => {
       const fromBal = prev.finance.wallets[fromWallet] || 0;
       const toBal = prev.finance.wallets[toWallet] || 0;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getLocalDateStr();
       const txOut = {
         id: 'tx_' + Date.now() + '_1',
         type: 'out',
@@ -844,7 +1203,7 @@ export const OSProvider = ({ children }) => {
         wallet,
         category,
         note,
-        date: date || new Date().toISOString().slice(0, 10)
+        date: date || getLocalDateStr()
       };
       return {
         ...prev,
@@ -878,6 +1237,55 @@ export const OSProvider = ({ children }) => {
         }
       };
     });
+  };
+
+  const setCategoryBudget = (categoryName, limitAmount) => {
+    const val = Math.max(0, Number(limitAmount) || 0);
+    setData(prev => ({
+      ...prev,
+      budgets: {
+        ...(prev.budgets || {}),
+        [categoryName]: val
+      }
+    }));
+  };
+
+  const addRecurringBill = ({ title, amount, wallet = 'bkash', category = 'Other', dayOfMonth = 1 }) => {
+    if (!title || !amount) return;
+    setData(prev => ({
+      ...prev,
+      recurringBills: [
+        {
+          id: 'bill_' + Date.now(),
+          title,
+          amount: Number(amount),
+          wallet,
+          category,
+          dayOfMonth: Number(dayOfMonth) || 1
+        },
+        ...(prev.recurringBills || [])
+      ]
+    }));
+  };
+
+  const logRecurringBill = (billId) => {
+    const target = (dataRef.current.recurringBills || []).find(b => b.id === billId);
+    if (!target) return;
+    addTransaction({
+      type: 'out',
+      amount: target.amount,
+      wallet: target.wallet,
+      category: target.category,
+      note: `Recurring Bill: ${target.title}`,
+      date: getLocalDateStr()
+    });
+  };
+
+  const deleteRecurringBill = (billId) => {
+    setData(prev => ({
+      ...prev,
+      recurringBills: (prev.recurringBills || []).filter(b => b.id !== billId)
+    }));
   };
 
   const addDebt = ({ person, type, amount, dueDate, note }) => {
@@ -931,13 +1339,21 @@ export const OSProvider = ({ children }) => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) return;
     setData(prev => {
-      const newDep = { id: 'dep_' + Date.now(), amount: numAmount, date: date || new Date().toISOString().slice(0, 10), note: note || 'Meal Deposit' };
+      const stamp = Date.now();
+      const linkedTxId = deductFromWallet && prev.finance.wallets[deductFromWallet] !== undefined ? 'tx_' + stamp : null;
+      const newDep = {
+        id: 'dep_' + stamp,
+        amount: numAmount,
+        date: date || getLocalDateStr(),
+        note: note || 'Meal Deposit',
+        linkedTxId
+      };
       const nextWallets = { ...prev.finance.wallets };
       const nextTransactions = [...prev.finance.transactions];
-      if (deductFromWallet && nextWallets[deductFromWallet] !== undefined) {
+      if (linkedTxId) {
         nextWallets[deductFromWallet] -= numAmount;
         nextTransactions.unshift({
-          id: 'tx_' + Date.now(),
+          id: linkedTxId,
           type: 'out',
           amount: numAmount,
           wallet: deductFromWallet,
@@ -955,13 +1371,28 @@ export const OSProvider = ({ children }) => {
   };
 
   const deleteMealDeposit = (depId) => {
-    setData(prev => ({
-      ...prev,
-      meals: {
-        ...prev.meals,
-        deposits: prev.meals.deposits.filter(d => d.id !== depId)
+    setData(prev => {
+      const targetDep = prev.meals.deposits.find(d => d.id === depId);
+      const nextWallets = { ...prev.finance.wallets };
+      let nextTransactions = prev.finance.transactions;
+
+      if (targetDep?.linkedTxId) {
+        const linkedTx = prev.finance.transactions.find(t => t.id === targetDep.linkedTxId);
+        if (linkedTx && nextWallets[linkedTx.wallet] !== undefined) {
+          nextWallets[linkedTx.wallet] += Number(linkedTx.amount || 0);
+        }
+        nextTransactions = prev.finance.transactions.filter(t => t.id !== targetDep.linkedTxId);
       }
-    }));
+
+      return {
+        ...prev,
+        finance: { ...prev.finance, wallets: nextWallets, transactions: nextTransactions },
+        meals: {
+          ...prev.meals,
+          deposits: prev.meals.deposits.filter(d => d.id !== depId)
+        }
+      };
+    });
   };
 
   const updateDailyMeal = (dateKey, mealData) => {
@@ -1007,7 +1438,8 @@ export const OSProvider = ({ children }) => {
         logs: {}
       },
       habits: {
-        minoxidilBottleStart: new Date().toISOString().slice(0, 10),
+        minoxidilBottleStart: getLocalDateStr(),
+        customHabits: prev.habits?.customHabits || [],
         dailyLogs: {}
       },
       goals: [],
@@ -1098,10 +1530,7 @@ export const OSProvider = ({ children }) => {
   const restoreFromJSONBackup = (parsedPayload) => {
     const incoming = parsedPayload?.rawState || parsedPayload;
     if (!incoming || typeof incoming !== 'object') return false;
-    setData((prev) => ({
-      ...prev,
-      ...incoming
-    }));
+    setData((prev) => normalizeOSState(incoming, prev));
     return true;
   };
 
@@ -1120,7 +1549,7 @@ export const OSProvider = ({ children }) => {
     if (!title) return;
     setData(prev => ({
       ...prev,
-      ideas: [{ id: 'idea_' + Date.now(), title, tag: tag || 'General', status: status || 'Just Idea', content: content || '', image: image || '', date: new Date().toISOString().slice(0, 10) }, ...prev.ideas]
+      ideas: [{ id: 'idea_' + Date.now(), title, tag: tag || 'General', status: status || 'Just Idea', content: content || '', image: image || '', date: getLocalDateStr() }, ...prev.ideas]
     }));
   };
 
@@ -1128,7 +1557,212 @@ export const OSProvider = ({ children }) => {
     setData(prev => ({ ...prev, ideas: prev.ideas.filter(i => i.id !== ideaId) }));
   };
 
-  // --- PART 4: SOCIAL AUTO-POSTER & AI AGENT HUB ACTIONS ---
+  // --- SECOND BRAIN (PARA Notes, Journal & Flashcards) ---
+  const upsertSecondBrainNote = (noteObj) => {
+    if (!noteObj?.title) return;
+    setData(prev => {
+      const existing = prev.secondBrain?.notes || [];
+      const idx = noteObj.id ? existing.findIndex(n => n.id === noteObj.id) : -1;
+      const cleanNote = {
+        id: noteObj.id || 'sb_' + Date.now(),
+        title: noteObj.title,
+        folder: noteObj.folder || 'Resources',
+        tags: Array.isArray(noteObj.tags)
+          ? noteObj.tags
+          : String(noteObj.tags || '').split(',').map(s => s.trim()).filter(Boolean),
+        content: noteObj.content || '',
+        pinned: Boolean(noteObj.pinned),
+        updatedAt: getLocalDateStr()
+      };
+      const nextNotes = idx >= 0
+        ? existing.map((n, i) => (i === idx ? cleanNote : n))
+        : [cleanNote, ...existing];
+      return {
+        ...prev,
+        secondBrain: { ...(prev.secondBrain || {}), notes: nextNotes }
+      };
+    });
+  };
+
+  const deleteSecondBrainNote = (noteId) => {
+    setData(prev => ({
+      ...prev,
+      secondBrain: {
+        ...(prev.secondBrain || {}),
+        notes: (prev.secondBrain?.notes || []).filter(n => n.id !== noteId)
+      }
+    }));
+  };
+
+  const saveDailyJournal = (dateKey, entry) => {
+    setData(prev => ({
+      ...prev,
+      secondBrain: {
+        ...(prev.secondBrain || {}),
+        journal: {
+          ...(prev.secondBrain?.journal || {}),
+          [dateKey]: { ...entry, updatedAt: getLocalDateStr() }
+        }
+      }
+    }));
+  };
+
+  const addFlashcard = ({ topic = 'General', front, back }) => {
+    if (!front || !back) return;
+    setData(prev => ({
+      ...prev,
+      secondBrain: {
+        ...(prev.secondBrain || {}),
+        flashcards: [
+          { id: 'fc_' + Date.now(), topic, front, back, mastery: 0, nextReview: getLocalDateStr() },
+          ...(prev.secondBrain?.flashcards || [])
+        ]
+      }
+    }));
+  };
+
+  const reviewFlashcard = (cardId, known) => {
+    setData(prev => ({
+      ...prev,
+      secondBrain: {
+        ...(prev.secondBrain || {}),
+        flashcards: (prev.secondBrain?.flashcards || []).map(c =>
+          c.id === cardId
+            ? { ...c, mastery: Math.max(0, (c.mastery || 0) + (known ? 1 : -1)), nextReview: getLocalDateStr() }
+            : c
+        )
+      }
+    }));
+  };
+
+  const deleteFlashcard = (cardId) => {
+    setData(prev => ({
+      ...prev,
+      secondBrain: {
+        ...(prev.secondBrain || {}),
+        flashcards: (prev.secondBrain?.flashcards || []).filter(c => c.id !== cardId)
+      }
+    }));
+  };
+
+  // --- CUSTOM DYNAMIC SECTIONS BUILDER ---
+  const createCustomSection = ({ title, description = '', type = 'checklist', items = [], config = {} }) => {
+    if (!title) return null;
+    const id = 'sec_' + Date.now();
+    const normalizedItems = (items || []).map((it, idx) => ({
+      id: `item_${Date.now()}_${idx}`,
+      label: typeof it === 'string' ? it : it.label || 'Item',
+      value: typeof it === 'object' ? it.value || '' : '',
+      done: Boolean(it?.done)
+    }));
+    setData(prev => ({
+      ...prev,
+      customSections: [
+        { id, title, description, type, config, items: normalizedItems, createdAt: getLocalDateStr() },
+        ...(prev.customSections || [])
+      ]
+    }));
+    return id;
+  };
+
+  const deleteCustomSection = (sectionId) => {
+    setData(prev => ({
+      ...prev,
+      customSections: (prev.customSections || []).filter(s => s.id !== sectionId)
+    }));
+  };
+
+  const addCustomSectionItem = (sectionId, item) => {
+    if (!item?.label) return;
+    setData(prev => ({
+      ...prev,
+      customSections: (prev.customSections || []).map(s =>
+        s.id === sectionId
+          ? {
+              ...s,
+              items: [
+                { id: 'item_' + Date.now(), label: item.label, value: item.value || '', done: false },
+                ...(s.items || [])
+              ]
+            }
+          : s
+      )
+    }));
+  };
+
+  const toggleCustomSectionItem = (sectionId, itemId) => {
+    setData(prev => ({
+      ...prev,
+      customSections: (prev.customSections || []).map(s =>
+        s.id === sectionId
+          ? {
+              ...s,
+              items: (s.items || []).map(it => (it.id === itemId ? { ...it, done: !it.done } : it))
+            }
+          : s
+      )
+    }));
+  };
+
+  const deleteCustomSectionItem = (sectionId, itemId) => {
+    setData(prev => ({
+      ...prev,
+      customSections: (prev.customSections || []).map(s =>
+        s.id === sectionId
+          ? { ...s, items: (s.items || []).filter(it => it.id !== itemId) }
+          : s
+      )
+    }));
+  };
+
+  // --- MEDIA VAULT (YouTube & Audio Tracks) ---
+  const saveMediaVideo = (videoObj) => {
+    if (!videoObj?.id) return;
+    setData(prev => {
+      const existing = prev.mediaVault?.savedVideos || [];
+      if (existing.some(v => v.id === videoObj.id)) return prev;
+      return {
+        ...prev,
+        mediaVault: { ...(prev.mediaVault || {}), savedVideos: [videoObj, ...existing] }
+      };
+    });
+  };
+
+  const removeMediaVideo = (videoId) => {
+    setData(prev => ({
+      ...prev,
+      mediaVault: {
+        ...(prev.mediaVault || {}),
+        savedVideos: (prev.mediaVault?.savedVideos || []).filter(v => v.id !== videoId)
+      }
+    }));
+  };
+
+  const addAudioTrack = (track) => {
+    if (!track?.title || !track?.url) return;
+    setData(prev => ({
+      ...prev,
+      mediaVault: {
+        ...(prev.mediaVault || {}),
+        audioTracks: [
+          { id: 'aud_' + Date.now(), ...track, addedAt: getLocalDateStr() },
+          ...(prev.mediaVault?.audioTracks || [])
+        ]
+      }
+    }));
+  };
+
+  const deleteAudioTrack = (trackId) => {
+    setData(prev => ({
+      ...prev,
+      mediaVault: {
+        ...(prev.mediaVault || {}),
+        audioTracks: (prev.mediaVault?.audioTracks || []).filter(t => t.id !== trackId)
+      }
+    }));
+  };
+
+  // --- PART 4: SOCIAL AUTO-POSTER & REAL WEBHOOK / AGENT HUB ACTIONS ---
   const addSocialPost = ({ platforms, content, mediaUrl, scheduleTime, status }) => {
     if (!content) return;
     setData(prev => ({
@@ -1140,23 +1774,52 @@ export const OSProvider = ({ children }) => {
           content,
           mediaUrl: mediaUrl || '',
           scheduleTime: scheduleTime || 'Immediate',
-          status: status || (prev.agents.autoApprove ? 'Auto-Published' : 'Pending Approval'),
-          liveLink: status === 'Published' ? 'https://social.kmmahim.com/post/' + Date.now() : ''
+          status: status || 'Pending Approval',
+          liveLink: ''
         },
         ...prev.socialQueue
       ]
     }));
   };
 
-  const approveAndPublishPost = (postId) => {
+  const approveAndPublishPost = async (postId) => {
+    const post = (dataRef.current.socialQueue || []).find(p => p.id === postId);
+    if (!post) return { success: false };
+    const webhookUrl = dataRef.current.agents?.webhookUrl || '';
+    const hasRealWebhook = webhookUrl && !webhookUrl.includes('yourdomain.com');
+
+    if (hasRealWebhook) {
+      try {
+        const resp = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Agent-Key': dataRef.current.agents?.apiKey || ''
+          },
+          body: JSON.stringify({ event: 'social_publish', post })
+        });
+        const statusText = resp.ok ? 'Dispatched to Webhook' : `Webhook HTTP ${resp.status}`;
+        setData(prev => ({
+          ...prev,
+          socialQueue: prev.socialQueue.map(p => (p.id === postId ? { ...p, status: statusText } : p))
+        }));
+        return { success: resp.ok, message: statusText };
+      } catch (err) {
+        setData(prev => ({
+          ...prev,
+          socialQueue: prev.socialQueue.map(p => (p.id === postId ? { ...p, status: 'Webhook Failed' } : p))
+        }));
+        return { success: false, message: err.message };
+      }
+    }
+
     setData(prev => ({
       ...prev,
       socialQueue: prev.socialQueue.map(p =>
-        p.id === postId
-          ? { ...p, status: 'Published via OpenClaw', liveLink: `https://openclaw.sync/live/${postId}` }
-          : p
+        p.id === postId ? { ...p, status: 'Approved (Local Queue — Connect Webhook)' } : p
       )
     }));
+    return { success: true, message: 'Approved in local queue.' };
   };
 
   const deleteSocialPost = (postId) => {
@@ -1166,13 +1829,40 @@ export const OSProvider = ({ children }) => {
     }));
   };
 
-  const dispatchAgentCommand = (agentName, commandText) => {
-    if (!commandText) return;
+  const dispatchAgentCommand = async (agentName, commandText) => {
+    if (!commandText) return { success: false };
+    const webhookUrl = dataRef.current.agents?.webhookUrl || '';
+    const hasRealWebhook = webhookUrl && !webhookUrl.includes('yourdomain.com');
+    let execNote = 'Added to Daily Goals (Webhook URL not configured — set n8n/OpenClaw URL to run remotely)';
+
+    if (hasRealWebhook) {
+      try {
+        const resp = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Agent-Key': dataRef.current.agents?.apiKey || ''
+          },
+          body: JSON.stringify({
+            event: 'agent_command',
+            agent: agentName,
+            command: commandText,
+            timestamp: new Date().toISOString()
+          })
+        });
+        execNote = resp.ok
+          ? `Webhook HTTP ${resp.status} OK — Executed: "${commandText}"`
+          : `Webhook Error HTTP ${resp.status} for: "${commandText}"`;
+      } catch (err) {
+        execNote = `Webhook Failed (${err.message}) — Logged locally`;
+      }
+    }
+
     setData(prev => {
       const logEntry = {
         id: 'log_' + Date.now(),
         agent: agentName,
-        text: `Executed: "${commandText}" -> Task synced to Goals & Social Queue.`,
+        text: execNote,
         time: new Date().toLocaleTimeString()
       };
       const autoGoal = {
@@ -1191,6 +1881,7 @@ export const OSProvider = ({ children }) => {
         }
       };
     });
+    return { success: true, note: execNote };
   };
 
   const updateAgentConfig = (newConfig) => {
@@ -1198,6 +1889,147 @@ export const OSProvider = ({ children }) => {
       ...prev,
       agents: { ...prev.agents, ...newConfig }
     }));
+  };
+
+  // --- REAL AI COPILOT TOOL-CALLING EXECUTOR ---
+  const executeAITools = async (actions = []) => {
+    const results = [];
+    for (const act of actions) {
+      const tool = act?.tool;
+      const args = act?.args || {};
+      try {
+        if (tool === 'add_transaction') {
+          addTransaction(args);
+          results.push(`✅ লেনদেন যোগ হয়েছে: ${args.type === 'in' ? '+' : '-'}৳${args.amount} (${args.note || args.category})`);
+        } else if (tool === 'set_wallet_balance') {
+          setWalletBalance(args.wallet, args.amount);
+          results.push(`✅ ${args.wallet} ব্যালেন্স আপডেট: ৳${args.amount}`);
+        } else if (tool === 'add_debt') {
+          addDebt(args);
+          results.push(`✅ ধার/বাকি যুক্ত: ${args.person} (৳${args.amount})`);
+        } else if (tool === 'log_meal') {
+          const dKey = args.date || getLocalDateStr();
+          const cur = dataRef.current.meals?.logs?.[dKey] || { breakfast: 0, lunch: 0, dinner: 0, guest: 0 };
+          updateDailyMeal(dKey, {
+            breakfast: args.breakfast ?? cur.breakfast,
+            lunch: args.lunch ?? cur.lunch,
+            dinner: args.dinner ?? cur.dinner,
+            guest: args.guest ?? cur.guest
+          });
+          results.push(`✅ মিল লগ আপডেট (${dKey})`);
+        } else if (tool === 'add_meal_deposit') {
+          addMealDeposit(args);
+          results.push(`✅ মিল ডিপোজিট সেভ: ৳${args.amount}`);
+        } else if (tool === 'toggle_namaz') {
+          const dKey = args.date || getLocalDateStr();
+          updateDailyHabits(dKey, prevDay => ({
+            ...prevDay,
+            namaz: { ...prevDay.namaz, [args.waqt]: args.done !== undefined ? Boolean(args.done) : !prevDay.namaz?.[args.waqt] }
+          }));
+          results.push(`✅ নামাজ আপডেট: ${args.waqt}`);
+        } else if (tool === 'log_gym') {
+          const dKey = args.date || getLocalDateStr();
+          updateDailyHabits(dKey, prevDay => ({
+            ...prevDay,
+            gym: {
+              done: args.done ?? true,
+              muscle: args.muscle || prevDay.gym?.muscle || '',
+              weightLog: args.weightLog || prevDay.gym?.weightLog || ''
+            }
+          }));
+          results.push(`✅ জিম লগ আপডেট`);
+        } else if (tool === 'add_custom_habit') {
+          addCustomHabit(args);
+          results.push(`✅ কাস্টম হ্যাবিট যোগ: ${args.label}`);
+        } else if (tool === 'add_goal') {
+          addGoal(args);
+          results.push(`✅ গোল যোগ হয়েছে: ${args.title}`);
+        } else if (tool === 'complete_goal') {
+          const kw = String(args.titleContains || '').toLowerCase();
+          const match = (dataRef.current.goals || []).find(g => g.title.toLowerCase().includes(kw) && !g.completed);
+          if (match) {
+            toggleGoalComplete(match.id);
+            results.push(`✅ গোল সম্পন্ন: ${match.title}`);
+          } else {
+            results.push(`ℹ️ "${args.titleContains}" নামে অসম্পূর্ণ গোল পাওয়া যায়নি`);
+          }
+        } else if (tool === 'create_note') {
+          upsertSecondBrainNote(args);
+          results.push(`✅ Second Brain-এ নোট সেভ হয়েছে: ${args.title}`);
+        } else if (tool === 'add_flashcard') {
+          addFlashcard(args);
+          results.push(`✅ ফ্ল্যাশকার্ড যোগ: ${args.front}`);
+        } else if (tool === 'create_custom_section') {
+          createCustomSection(args);
+          results.push(`✅ নতুন কাস্টম সেকশন তৈরি হয়েছে: "${args.title}"`);
+        } else if (tool === 'update_public_now') {
+          updateProfile({ nowStatus: args.nowStatus });
+          results.push(`✅ পাবলিক Now Status আপডেট হয়েছে`);
+        } else if (tool === 'add_project') {
+          addProject(args);
+          results.push(`✅ পাবলিক পোর্টফোলিও প্রোজেক্ট যোগ হয়েছে: ${args.title}`);
+        } else if (tool === 'navigate_tab' && args.tab) {
+          setActiveTab(args.tab);
+          results.push(`🧭 ${args.tab} ট্যাবে নেভিগেট করা হয়েছে`);
+        } else if (tool === 'gmail_list') {
+          const emails = await listGmailMessages(googleSession.accessToken, args.query || '', args.maxResults || 8);
+          setIntegrationFeeds(f => ({ ...f, emails }));
+          setActiveArtifact({
+            title: 'Gmail Inbox Feed',
+            type: 'markdown',
+            content: emails.map((e, i) => `${i + 1}. **${e.subject}**\n   - From: ${e.from}\n   - ${e.snippet}`).join('\n\n') || 'কোনো মেইল পাওয়া যায়নি।'
+          });
+          results.push(`📧 ${emails.length}টি Gmail আনা হয়েছে (ডান দিকের Artifact-এ দেখুন)`);
+        } else if (tool === 'gmail_send') {
+          await sendGmailMessage(googleSession.accessToken, args);
+          results.push(`✅ ইমেইল পাঠানো হয়েছে → ${args.to}`);
+        } else if (tool === 'calendar_list') {
+          const events = await listCalendarEvents(googleSession.accessToken, args.maxResults || 12);
+          setIntegrationFeeds(f => ({ ...f, events }));
+          setActiveArtifact({
+            title: 'Google Calendar Agenda',
+            type: 'markdown',
+            content: events.map((ev, i) => `${i + 1}. **${ev.summary}**\n   - Time: ${ev.start}`).join('\n\n') || 'আসন্ন কোনো ইভেন্ট নেই।'
+          });
+          results.push(`📅 ${events.length}টি ক্যালেন্ডার ইভেন্ট পাওয়া গেছে`);
+        } else if (tool === 'calendar_create') {
+          await createCalendarEvent(googleSession.accessToken, args);
+          results.push(`✅ Google Calendar ইভেন্ট তৈরি হয়েছে: ${args.summary}`);
+        } else if (tool === 'contacts_search') {
+          const contacts = await listGoogleContacts(googleSession.accessToken, args.query || '', 25);
+          setIntegrationFeeds(f => ({ ...f, contacts }));
+          setActiveArtifact({
+            title: `Google Contacts (${args.query || 'All'})`,
+            type: 'markdown',
+            content: contacts.map(c => `- **${c.name}** — ${c.phone || 'No Phone'} | ${c.email || 'No Email'}`).join('\n') || 'কোনো কন্টাক্ট পাওয়া যায়নি।'
+          });
+          results.push(`👥 ${contacts.length}টি কন্টাক্ট পাওয়া গেছে`);
+        } else if (tool === 'whatsapp_send') {
+          const waRes = await sendWhatsAppMessage({
+            toPhone: args.toPhone,
+            message: args.message,
+            cloudToken: secretConfig.metaWaToken,
+            phoneNumberId: secretConfig.metaWaPhoneId,
+            webhookUrl: secretConfig.whatsappWebhookUrl
+          });
+          if (waRes.mode === 'deep_link' && waRes.url) {
+            window.open(waRes.url, '_blank', 'noopener,noreferrer');
+          }
+          results.push(waRes.success ? `💬 ${waRes.message}` : `⚠️ WhatsApp: ${waRes.message}`);
+        } else if (tool === 'youtube_fetch') {
+          const yt = await fetchYouTubeVideos({
+            accessToken: googleSession.accessToken,
+            apiKey: secretConfig.youtubeApiKey,
+            playlistId: args.playlistId || ''
+          });
+          setIntegrationFeeds(f => ({ ...f, youtubeVideos: yt.videos, youtubeChannelTitle: yt.channelTitle }));
+          results.push(`▶️ ${yt.videos.length}টি YouTube ভিডিও লোড হয়েছে (${yt.channelTitle || 'Playlist'})`);
+        }
+      } catch (err) {
+        results.push(`❌ ${tool} ব্যর্থ: ${err.message}`);
+      }
+    }
+    return results;
   };
 
   return (
@@ -1209,9 +2041,35 @@ export const OSProvider = ({ children }) => {
         setIsAuthenticated,
         activeLayer,
         setActiveLayer,
+        lockOS,
+        activeTab,
+        setActiveTab,
         showPinModal,
         setShowPinModal,
         verifyPin,
+        secretConfig,
+        updateSecretConfig,
+        googleSession,
+        saveGoogleSession,
+        integrationFeeds,
+        setIntegrationFeeds,
+        pomodoro,
+        applyPomodoroPreset,
+        togglePomodoroRun,
+        dismissPomodoroNotice,
+        audioPlayer,
+        playAudioTrack,
+        toggleAudioPlayPause,
+        stopAudioTrack,
+        aiMessages,
+        setAiMessages,
+        activeArtifact,
+        setActiveArtifact,
+        showCopilotDrawer,
+        setShowCopilotDrawer,
+        executeAITools,
+        publicInquiries,
+        loadPublicInquiries,
         updateProfile,
         addProject,
         deleteProject,
@@ -1221,6 +2079,10 @@ export const OSProvider = ({ children }) => {
         transferBetweenWallets,
         addTransaction,
         deleteTransaction,
+        setCategoryBudget,
+        addRecurringBill,
+        logRecurringBill,
+        deleteRecurringBill,
         addDebt,
         toggleDebtSettled,
         deleteDebt,
@@ -1244,6 +2106,21 @@ export const OSProvider = ({ children }) => {
         restoreFromJSONBackup,
         addIdea,
         deleteIdea,
+        upsertSecondBrainNote,
+        deleteSecondBrainNote,
+        saveDailyJournal,
+        addFlashcard,
+        reviewFlashcard,
+        deleteFlashcard,
+        createCustomSection,
+        deleteCustomSection,
+        addCustomSectionItem,
+        toggleCustomSectionItem,
+        deleteCustomSectionItem,
+        saveMediaVideo,
+        removeMediaVideo,
+        addAudioTrack,
+        deleteAudioTrack,
         addSocialPost,
         approveAndPublishPost,
         deleteSocialPost,
@@ -1259,6 +2136,13 @@ export const OSProvider = ({ children }) => {
         refreshCloudStatus
       }}
     >
+      <audio
+        ref={audioElRef}
+        onEnded={() => setAudioPlayer((p) => ({ ...p, isPlaying: false }))}
+        onPause={() => setAudioPlayer((p) => ({ ...p, isPlaying: false }))}
+        onPlay={() => setAudioPlayer((p) => ({ ...p, isPlaying: true }))}
+        className="hidden"
+      />
       {children}
     </OSContext.Provider>
   );

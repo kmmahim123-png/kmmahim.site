@@ -48,7 +48,16 @@ function getTimeRemainingForCycle(timeframe, now) {
 }
 
 export default function GoalsTracker() {
-  const { data, addGoal, toggleGoalComplete, deleteGoal } = useOS();
+  const {
+    data,
+    addGoal,
+    toggleGoalComplete,
+    deleteGoal,
+    pomodoro,
+    applyPomodoroPreset,
+    togglePomodoroRun,
+    dismissPomodoroNotice
+  } = useOS();
   const { goals } = data;
 
   const [title, setTitle] = useState('');
@@ -56,6 +65,7 @@ export default function GoalsTracker() {
   const [category, setCategory] = useState('Academic');
   const [deadline, setDeadline] = useState('');
   const [activeTab, setActiveTab] = useState('daily');
+  const [draftCustomMins, setDraftCustomMins] = useState(pomodoro.customMinutes || 25);
 
   // Real-time ticking clock for Cycle Countdowns
   const [now, setNow] = useState(new Date());
@@ -69,28 +79,11 @@ export default function GoalsTracker() {
     [activeTab, now]
   );
 
-  // Custom Pomodoro Timer State
-  const [customMinutes, setCustomMinutes] = useState(25);
-  const [totalSessionSecs, setTotalSessionSecs] = useState(25 * 60);
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [timerMode, setTimerMode] = useState('work'); // 'work' | 'break'
-
-  useEffect(() => {
-    let timer = null;
-    if (isRunning && timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      SoundFX.success();
-      alert(
-        timerMode === 'work'
-          ? '🎉 ফোকাস সেশন সম্পন্ন হয়েছে! একটু বিরতি নিন।'
-          : '⚡ বিরতি শেষ! আবার কাজে মনোযোগ দিন।'
-      );
-    }
-    return () => clearInterval(timer);
-  }, [isRunning, timeLeft, timerMode]);
+  const customMinutes = draftCustomMins;
+  const totalSessionSecs = pomodoro.totalSessionSecs;
+  const timeLeft = pomodoro.timeLeft;
+  const isRunning = pomodoro.isRunning;
+  const timerMode = pomodoro.mode;
 
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
@@ -105,11 +98,8 @@ export default function GoalsTracker() {
   const applyCustomTimer = (mins, mode = 'work') => {
     const cleanMins = Math.max(1, Math.min(240, Number(mins) || 25));
     SoundFX.click();
-    setIsRunning(false);
-    setTimerMode(mode);
-    setCustomMinutes(cleanMins);
-    setTotalSessionSecs(cleanMins * 60);
-    setTimeLeft(cleanMins * 60);
+    setDraftCustomMins(cleanMins);
+    applyPomodoroPreset(cleanMins, mode);
   };
 
   const handleAddGoal = (e) => {
@@ -381,17 +371,24 @@ export default function GoalsTracker() {
                 {formatTime(timeLeft)}
               </span>
               <span className="text-[10px] font-mono text-cyan-300 uppercase mt-1">
-                {customMinutes} Min Session
+                {pomodoro.customMinutes} Min Session
               </span>
             </div>
           </div>
+
+          {pomodoro.finishedNotice && (
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-between gap-2">
+              <span>🎉 {pomodoro.finishedNotice}</span>
+              <button onClick={dismissPomodoroNotice} className="text-[10px] underline">OK</button>
+            </div>
+          )}
 
           {/* Start / Pause / Reset */}
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => {
                 SoundFX.click();
-                setIsRunning(!isRunning);
+                togglePomodoroRun();
               }}
               className={`px-6 py-3 rounded-2xl font-bold text-xs flex items-center gap-2 text-white shadow-lg transition active:scale-95 ${
                 isRunning ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'
@@ -402,7 +399,7 @@ export default function GoalsTracker() {
             </button>
 
             <button
-              onClick={() => applyCustomTimer(customMinutes, timerMode)}
+              onClick={() => applyCustomTimer(pomodoro.customMinutes, timerMode)}
               className="p-3 rounded-2xl glass-pill hover:bg-white/10 text-slate-300"
               title="Reset Timer"
             >
@@ -423,7 +420,7 @@ export default function GoalsTracker() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => applyCustomTimer(Math.max(1, customMinutes - 5), 'work')}
+                onClick={() => applyCustomTimer(Math.max(1, draftCustomMins - 5), 'work')}
                 className="px-3 py-2 rounded-xl glass-pill text-xs font-bold text-slate-200 hover:bg-white/10"
               >
                 -5m
@@ -432,20 +429,20 @@ export default function GoalsTracker() {
                 type="number"
                 min="1"
                 max="240"
-                value={customMinutes}
-                onChange={(e) => setCustomMinutes(Number(e.target.value))}
+                value={draftCustomMins}
+                onChange={(e) => setDraftCustomMins(Number(e.target.value))}
                 className="flex-1 px-3 py-2 rounded-xl glass-input text-center text-sm font-bold"
               />
               <button
                 type="button"
-                onClick={() => applyCustomTimer(Math.min(240, customMinutes + 5), 'work')}
+                onClick={() => applyCustomTimer(Math.min(240, draftCustomMins + 5), 'work')}
                 className="px-3 py-2 rounded-xl glass-pill text-xs font-bold text-slate-200 hover:bg-white/10"
               >
                 +5m
               </button>
               <button
                 type="button"
-                onClick={() => applyCustomTimer(customMinutes, 'work')}
+                onClick={() => applyCustomTimer(draftCustomMins, 'work')}
                 className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white"
               >
                 Set
