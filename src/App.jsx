@@ -2,7 +2,53 @@ import React, { useState } from 'react';
 import { OSProvider, useOS } from './context/OSContext';
 import Layer1Public from './components/Layer1Public';
 import Layer2Shell from './components/Layer2Shell';
-import { Lock, X } from 'lucide-react';
+import { Lock, X, RefreshCw } from 'lucide-react';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('App Error Caught by Boundary:', error, errorInfo);
+  }
+  handleReset = () => {
+    try {
+      localStorage.removeItem('KM_MAHIM_LIFE_OS_V1');
+      window.location.reload();
+    } catch {
+      window.location.reload();
+    }
+  };
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#05070e] text-slate-100 flex items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/30 shadow-2xl space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-lg">
+              OS
+            </div>
+            <h2 className="text-xl font-bold text-white">System Handshake Protocol</h2>
+            <p className="text-xs text-slate-400">
+              The application recovered from an unexpected state. Click below to refresh the workspace cleanly.
+            </p>
+            <button
+              onClick={this.handleReset}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 mx-auto transition"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh & Restore OS</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function SecretPinModal() {
   const { showPinModal, setShowPinModal, verifyPin } = useOS();
@@ -74,8 +120,10 @@ function MainRouter() {
 
 export default function App() {
   return (
-    <OSProvider>
-      <MainRouter/>
-    </OSProvider>
+    <ErrorBoundary>
+      <OSProvider>
+        <MainRouter/>
+      </OSProvider>
+    </ErrorBoundary>
   );
 }

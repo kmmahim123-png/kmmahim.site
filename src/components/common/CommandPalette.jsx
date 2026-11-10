@@ -15,7 +15,7 @@ export default function CommandPalette({
 
   const commands = [
     { id: 'life-os', label: 'Unlock / Open Private Life OS', icon: Terminal, action: onOpenLifeOS, badge: 'PIN: 2526' },
-    { id: 'download', label: 'Download Android APK & Install PWA', icon: Download, action: onOpenDownload, badge: 'APK 4.5MB' },
+    { id: 'download', label: 'Download Android APK & Install PWA', icon: Download, action: onOpenDownload, badge: 'APK 4.6MB' },
     { id: 'sound', label: soundOn ? 'Mute Sci-Fi Audio FX' : 'Enable Sci-Fi Audio FX', icon: soundOn ? Volume2 : VolumeX, action: onToggleSound, badge: soundOn ? 'ON' : 'OFF' },
     { id: 'projects', label: 'Explore Projects & Brands (JACKFRU)', icon: Globe, action: () => { window.location.hash = '#projects'; onClose(); } },
     { id: 'services', label: 'Book a Project / Service Package', icon: Target, action: () => { window.location.hash = '#services'; onClose(); } },

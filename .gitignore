@@ -13,6 +13,7 @@ dist-ssr
 *.local
 *.apk
 !public/*.apk
+.mcp.json
 
 # Editor directories and files
 .vscode/*

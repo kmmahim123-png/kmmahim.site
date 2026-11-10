@@ -119,7 +119,7 @@ export default function AppDownloadModal({ isOpen, onClose }) {
                     ১. Direct Android APK ডাউনলোড (.apk)
                   </h4>
                   <span className="text-[11px] text-emerald-400 font-mono block">
-                    {isDownloading ? '📥 ডাউনলোডিং শুরু হয়েছে...' : 'সাইজ: ৪.৫ MB • যেকোনো ফোনে চলবে'}
+                    {isDownloading ? '📥 ডাউনলোডিং শুরু হয়েছে...' : 'সাইজ: ৪.৬ MB • যেকোনো ফোনে চলবে'}
                   </span>
                 </div>
               </div>

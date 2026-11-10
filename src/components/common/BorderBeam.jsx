@@ -9,26 +9,28 @@ export function BorderBeam({
   className = ''
 }) {
   return (
-    <div className={`pointer-events-none absolute -inset-px rounded-[inherit] overflow-hidden ${className}`}>
+    <div className={`pointer-events-none absolute -inset-[1px] rounded-[inherit] overflow-hidden ${className}`}>
+      {/* Universal rotating gradient border compatible with all mobile & WebView engines */}
       <motion.div
-        animate={{
-          offsetDistance: ['0%', '100%']
-        }}
+        animate={{ rotate: [0, 360] }}
         transition={{
           duration,
           ease: 'linear',
           repeat: Infinity
         }}
         style={{
-          width: size,
-          aspectRatio: '1',
-          background: `radial-gradient(circle, ${colorFrom} 10%, ${colorTo} 40%, transparent 70%)`,
-          offsetPath: 'rect(0 100% 100% 0 round 1rem)',
+          width: '200%',
+          height: '200%',
           position: 'absolute',
-          filter: 'blur(3px)',
-          opacity: 0.85
+          top: '-50%',
+          left: '-50%',
+          background: `conic-gradient(from 0deg, transparent 0deg, transparent 280deg, ${colorFrom} 330deg, ${colorTo} 360deg)`,
+          opacity: 0.9,
+          filter: 'blur(1px)'
         }}
       />
+      {/* Inner card overlay so only the 1.5px border glows */}
+      <div className="absolute inset-[1.5px] rounded-[inherit] bg-slate-950/90 backdrop-blur-xl" />
     </div>
   );
 }
