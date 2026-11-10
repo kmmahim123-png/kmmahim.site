@@ -89,7 +89,8 @@ Return actions ONLY when the user asks you to record, modify, create, trigger, o
 20. contacts_search: { "query": string }
 21. whatsapp_send: { "toPhone": string, "message": string }
 22. youtube_fetch: { "playlistId": string }
-23. navigate_tab: { "tab": "overview"|"ai_desk"|"second_brain"|"connections"|"media"|"custom"|"finance"|"meals"|"habits"|"goals"|"social"|"agents"|"cms" }
+23. youtube_search: { "query": string }
+24. navigate_tab: { "tab": "overview"|"ai_desk"|"second_brain"|"connections"|"media"|"custom"|"finance"|"meals"|"habits"|"goals"|"social"|"agents"|"cms" }
 
 === RESPONSE FORMAT (STRICT JSON ONLY) ===
 Reply ONLY with valid JSON (no markdown wrapping outside JSON):

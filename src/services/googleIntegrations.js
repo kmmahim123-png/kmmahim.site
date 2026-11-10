@@ -186,63 +186,48 @@ export async function listGoogleContacts(accessToken, query = '', pageSize = 50)
   }));
 }
 
-// --- YOUTUBE ACCOUNT VIDEOS / PLAYLISTS ---
-export async function fetchYouTubeVideos({ accessToken, apiKey, playlistId = '', maxResults = 16 }) {
-  let targetPlaylistId = playlistId?.trim() || '';
-
-  const ytFetch = async (endpoint) => {
-    const sep = endpoint.includes('?') ? '&' : '?';
-    const finalUrl =
-      accessToken && !apiKey
-        ? endpoint
-        : apiKey
-        ? `${endpoint}${sep}key=${encodeURIComponent(apiKey)}`
-        : endpoint;
-
-    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-    const resp = await fetch(finalUrl, { headers });
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      throw new Error(json?.error?.message || `YouTube API HTTP ${resp.status}`);
-    }
-    return json;
-  };
-
-  let channelTitle = '';
-
-  if (!targetPlaylistId) {
-    if (!accessToken && !apiKey) {
-      throw new Error('Google অ্যাকাউন্ট কানেক্ট করুন অথবা YouTube Data API Key দিন।');
-    }
-    if (accessToken) {
-      const ch = await ytFetch(
-        'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&mine=true'
-      );
-      const first = ch.items?.[0];
-      if (!first) {
-        throw new Error('এই Google অ্যাকাউন্টে কোনো YouTube চ্যানেল পাওয়া যায়নি।');
-      }
-      channelTitle = first.snippet?.title || 'My YouTube Channel';
-      targetPlaylistId = first.contentDetails?.relatedPlaylists?.uploads || '';
-    } else {
-      throw new Error('API Key ব্যবহার করলে একটি Playlist ID অথবা Channel ID দিন।');
-    }
+// --- YOUTUBE ACCOUNT VIDEOS, SUBSCRIPTIONS, SEARCH, LIKED & PLAYLISTS ---
+async function ytApiGet(endpoint, { accessToken = '', apiKey = '' } = {}) {
+  const cleanToken = String(accessToken || '').trim();
+  const cleanKey = String(apiKey || '').trim();
+  if (!cleanToken && !cleanKey) {
+    throw new Error('প্রথমে Google অ্যাকাউন্ট কানেক্ট করুন অথবা একটি বৈধ YouTube API Key দিন।');
   }
 
-  const plResp = await ytFetch(
-    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(
-      targetPlaylistId
-    )}&maxResults=${maxResults}`
-  );
+  const sep = endpoint.includes('?') ? '&' : '?';
+  // Prefer OAuth Bearer token alone when logged in so a mismatched/blank API key cannot interfere
+  const finalUrl = cleanToken ? endpoint : `${endpoint}${sep}key=${encodeURIComponent(cleanKey)}`;
+  const headers = cleanToken ? { Authorization: `Bearer ${cleanToken}` } : {};
 
-  const videos = (plResp.items || [])
+  let resp;
+  try {
+    resp = await fetch(finalUrl, { headers, mode: 'cors' });
+  } catch (netErr) {
+    throw new Error(
+      `YouTube API নেটওয়ার্ক ব্লক হয়েছে (${netErr.message})। ব্রাউজারে Ad-Blocker/Shield বন্ধ করে এবং Ctrl+Shift+R দিয়ে পেজ রিফ্রেশ করে আবার চেষ্টা করুন।`
+    );
+  }
+
+  const json = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(json?.error?.message || `YouTube API HTTP ${resp.status}`);
+  }
+  return json;
+}
+
+function mapPlaylistOrVideoItems(items = [], fallbackChannel = 'YouTube') {
+  return (items || [])
     .map((item) => {
-      const vidId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
+      const vidId =
+        typeof item.id === 'string'
+          ? item.id
+          : item.id?.videoId || item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
       if (!vidId) return null;
       return {
         id: vidId,
         title: item.snippet?.title || 'Untitled Video',
-        channel: item.snippet?.videoOwnerChannelTitle || channelTitle || 'YouTube',
+        channel:
+          item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || fallbackChannel,
         publishedAt: item.snippet?.publishedAt?.slice(0, 10) || '',
         thumbnail:
           item.snippet?.thumbnails?.high?.url ||
@@ -251,8 +236,118 @@ export async function fetchYouTubeVideos({ accessToken, apiKey, playlistId = '',
       };
     })
     .filter(Boolean);
+}
 
-  return { channelTitle, playlistId: targetPlaylistId, videos };
+export async function fetchYouTubeVideos({ accessToken, apiKey, playlistId = '', maxResults = 20 }) {
+  let targetPlaylistId = playlistId?.trim() || '';
+  let channelTitle = '';
+
+  if (!targetPlaylistId) {
+    if (!accessToken) {
+      throw new Error('আপনার চ্যানেল দেখতে Google Connect করুন, অথবা নিচের Search / Playlist বক্স ব্যবহার করুন।');
+    }
+    const ch = await ytApiGet(
+      'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&mine=true',
+      { accessToken, apiKey }
+    );
+    const first = ch.items?.[0];
+    if (!first) {
+      return { channelTitle: 'No Channel Uploads', playlistId: '', videos: [] };
+    }
+    channelTitle = first.snippet?.title || 'My YouTube Channel';
+    targetPlaylistId = first.contentDetails?.relatedPlaylists?.uploads || '';
+    if (!targetPlaylistId) {
+      return { channelTitle, playlistId: '', videos: [] };
+    }
+  }
+
+  const plResp = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${encodeURIComponent(
+      targetPlaylistId
+    )}&maxResults=${maxResults}`,
+    { accessToken, apiKey }
+  );
+
+  return {
+    channelTitle,
+    playlistId: targetPlaylistId,
+    videos: mapPlaylistOrVideoItems(plResp.items, channelTitle || 'YouTube')
+  };
+}
+
+export async function searchYouTubeVideos({ accessToken, apiKey, query, maxResults = 16 }) {
+  const q = String(query || '').trim();
+  if (!q) throw new Error('সার্চ করার জন্য কিছু লিখুন।');
+  const json = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(q)}`,
+    { accessToken, apiKey }
+  );
+  return mapPlaylistOrVideoItems(json.items);
+}
+
+export async function fetchTrendingYouTubeVideos({ accessToken, apiKey, regionCode = 'BD', maxResults = 16 }) {
+  const json = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&regionCode=${regionCode}&maxResults=${maxResults}`,
+    { accessToken, apiKey }
+  );
+  return mapPlaylistOrVideoItems(json.items);
+}
+
+export async function fetchLikedYouTubeVideos({ accessToken, apiKey, maxResults = 20 }) {
+  const json = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&myRating=like&maxResults=${maxResults}`,
+    { accessToken, apiKey }
+  );
+  return mapPlaylistOrVideoItems(json.items);
+}
+
+export async function fetchYouTubeSubscriptions({ accessToken, maxResults = 30 }) {
+  const json = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&order=alphabetical&maxResults=${maxResults}`,
+    { accessToken }
+  );
+  return (json.items || []).map((it) => ({
+    channelId: it.snippet?.resourceId?.channelId || '',
+    title: it.snippet?.title || 'Channel',
+    thumbnail: it.snippet?.thumbnails?.default?.url || ''
+  })).filter((c) => c.channelId);
+}
+
+export async function fetchMyYouTubePlaylists({ accessToken, maxResults = 25 }) {
+  const json = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&mine=true&maxResults=${maxResults}`,
+    { accessToken }
+  );
+  return (json.items || []).map((pl) => ({
+    id: pl.id,
+    title: pl.snippet?.title || 'Playlist',
+    count: pl.contentDetails?.itemCount || 0,
+    thumbnail: pl.snippet?.thumbnails?.medium?.url || ''
+  }));
+}
+
+export async function fetchChannelUploads({ accessToken, apiKey, channelId, maxResults = 12 }) {
+  const ch = await ytApiGet(
+    `https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&id=${encodeURIComponent(channelId)}`,
+    { accessToken, apiKey }
+  );
+  const first = ch.items?.[0];
+  const uploadsId = first?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsId) return [];
+  const res = await fetchYouTubeVideos({ accessToken, apiKey, playlistId: uploadsId, maxResults });
+  return res.videos;
+}
+
+export async function fetchSubscribedFeed({ accessToken, apiKey, maxChannels = 6 }) {
+  const subs = await fetchYouTubeSubscriptions({ accessToken, maxResults: maxChannels });
+  const lists = await Promise.all(
+    subs.slice(0, maxChannels).map((s) =>
+      fetchChannelUploads({ accessToken, apiKey, channelId: s.channelId, maxResults: 3 }).catch(() => [])
+    )
+  );
+  const combined = lists.flat();
+  combined.sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || ''));
+  return { subscriptions: subs, videos: combined };
 }
 
 export function extractYouTubeVideoId(input = '') {

@@ -15,7 +15,8 @@ import {
   listCalendarEvents,
   createCalendarEvent,
   listGoogleContacts,
-  fetchYouTubeVideos
+  fetchYouTubeVideos,
+  searchYouTubeVideos
 } from '../services/googleIntegrations';
 import { sendWhatsAppMessage } from '../services/whatsappService';
 import { SoundFX } from '../components/common/SoundEffects';
@@ -2024,6 +2025,15 @@ export const OSProvider = ({ children }) => {
           });
           setIntegrationFeeds(f => ({ ...f, youtubeVideos: yt.videos, youtubeChannelTitle: yt.channelTitle }));
           results.push(`▶️ ${yt.videos.length}টি YouTube ভিডিও লোড হয়েছে (${yt.channelTitle || 'Playlist'})`);
+        } else if (tool === 'youtube_search') {
+          const vids = await searchYouTubeVideos({
+            accessToken: googleSession.accessToken,
+            apiKey: secretConfig.youtubeApiKey,
+            query: args.query || ''
+          });
+          setIntegrationFeeds(f => ({ ...f, youtubeVideos: vids, youtubeChannelTitle: `Search: ${args.query}` }));
+          setActiveTab('media');
+          results.push(`🔍 "${args.query}"-এর ${vids.length}টি YouTube ভিডিও Media ট্যাবে লোড হয়েছে`);
         }
       } catch (err) {
         results.push(`❌ ${tool} ব্যর্থ: ${err.message}`);
