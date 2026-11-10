@@ -16,6 +16,8 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/cli": "^8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@supabase/server": "^1.9.2",
+    "@supabase/supabase-js": "^2.119.0",
     "framer-motion": "^14.11.1",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",

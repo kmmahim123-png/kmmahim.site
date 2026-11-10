@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { uploadLifeOSData, fetchLifeOSData } from '../services/supabaseClient';
 
 const OSContext = createContext();
 
@@ -220,6 +221,87 @@ export const OSProvider = ({ children }) => {
     }
     return false;
   };
+
+  // Supabase Cloud Sync State & Actions
+  const [syncStatus, setSyncStatus] = useState({
+    status: 'idle', // 'idle' | 'syncing' | 'success' | 'error'
+    lastSync: null,
+    message: ''
+  });
+
+  const [autoSync, setAutoSync] = useState(() => {
+    return localStorage.getItem('KM_MAHIM_AUTOSYNC') === 'true';
+  });
+
+  const toggleAutoSync = () => {
+    setAutoSync((prev) => {
+      const next = !prev;
+      localStorage.setItem('KM_MAHIM_AUTOSYNC', String(next));
+      return next;
+    });
+  };
+
+  const uploadToSupabase = async (overrideData = null) => {
+    setSyncStatus({ status: 'syncing', lastSync: null, message: 'Uploading to Supabase...' });
+    const payload = overrideData || data;
+    const result = await uploadLifeOSData('primary_os', payload);
+    if (result.success) {
+      setSyncStatus({
+        status: 'success',
+        lastSync: result.timestamp,
+        message: result.message
+      });
+      return true;
+    } else {
+      setSyncStatus({
+        status: 'error',
+        lastSync: null,
+        message: result.message
+      });
+      return false;
+    }
+  };
+
+  const pullFromSupabase = async () => {
+    setSyncStatus({ status: 'syncing', lastSync: null, message: 'Pulling latest from Supabase...' });
+    const result = await fetchLifeOSData('primary_os');
+    if (result.success && result.data) {
+      setData((prev) => ({
+        ...prev,
+        ...result.data
+      }));
+      setSyncStatus({
+        status: 'success',
+        lastSync: result.timestamp,
+        message: 'Restored from Supabase cloud!'
+      });
+      return true;
+    } else {
+      setSyncStatus({
+        status: 'error',
+        lastSync: null,
+        message: result.message || 'No cloud backup found'
+      });
+      return false;
+    }
+  };
+
+  // Auto-sync debounce on data changes
+  useEffect(() => {
+    if (!autoSync) return;
+    const timeout = setTimeout(() => {
+      uploadLifeOSData('primary_os', data).then((res) => {
+        if (res.success) {
+          setSyncStatus({
+            status: 'success',
+            lastSync: res.timestamp,
+            message: 'Auto-synced to Supabase ⚡'
+          });
+        }
+      });
+    }, 4000);
+    return () => clearTimeout(timeout);
+  }, [data, autoSync]);
 
   // Part 1 Actions
   const updateProfile = (newProfile) => {
@@ -482,7 +564,12 @@ export const OSProvider = ({ children }) => {
         approveAndPublishPost,
         deleteSocialPost,
         dispatchAgentCommand,
-        updateAgentConfig
+        updateAgentConfig,
+        syncStatus,
+        autoSync,
+        toggleAutoSync,
+        uploadToSupabase,
+        pullFromSupabase
       }}
     >
       {children}
