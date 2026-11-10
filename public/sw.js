@@ -1,4 +1,4 @@
-const CACHE_NAME = 'km-mahim-os-v5';
+const CACHE_NAME = 'km-mahim-os-v6';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

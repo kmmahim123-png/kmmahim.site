@@ -60,6 +60,7 @@ export default function MediaVault() {
 
   const [subsList, setSubsList] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [useNoCookie, setUseNoCookie] = useState(false);
 
   // Background Audio Track Form
   const [audTitle, setAudTitle] = useState('');
@@ -484,11 +485,12 @@ export default function MediaVault() {
               <>
                 <div className="aspect-video bg-black">
                   <iframe
-                    key={activeVideo.id}
+                    key={`${activeVideo.id}-${useNoCookie ? 'nc' : 'std'}`}
                     title={activeVideo.title}
-                    src={`https://www.youtube-nocookie.com/embed/${activeVideo.id}?rel=0&modestbranding=1`}
-                    className="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    src={`https://${useNoCookie ? 'www.youtube-nocookie.com' : 'www.youtube.com'}/embed/${activeVideo.id}?rel=0&playsinline=1`}
+                    className="w-full h-full border-0"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   />
                 </div>
@@ -497,7 +499,14 @@ export default function MediaVault() {
                     <h3 className="font-bold text-sm text-white truncate">{activeVideo.title}</h3>
                     <span className="text-[11px] text-slate-400">{activeVideo.channel}</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setUseNoCookie((v) => !v)}
+                      className="px-2.5 py-1.5 rounded-xl glass-pill text-[10px] font-mono text-slate-300 hover:text-white"
+                      title="Switch between Standard and Privacy YouTube embed"
+                    >
+                      {useNoCookie ? 'Mode: No-Cookie' : 'Mode: Standard'}
+                    </button>
                     <button
                       onClick={() => stepQueue(-1)}
                       className="p-2 rounded-xl glass-pill hover:bg-white/10 text-slate-200"
