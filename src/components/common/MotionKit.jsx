@@ -104,14 +104,14 @@ export function AnimatedCounter({ value, prefix = '', suffix = '', duration = 1.
   );
 }
 
-// --- SECRET PWA INSTALL WIDGET (LAYER 2 ONLY) ---
+// --- SECRET PWA INSTALL & APK DOWNLOAD WIDGET (LAYER 2 ONLY) ---
 export function SecretPWAWidget() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
-    // Check if app is already running in standalone mode (PWA installed)
     if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
       setIsInstalled(true);
     }
@@ -132,8 +132,7 @@ export function SecretPWAWidget() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
-      // Fallback instruction for browsers that don't trigger prompt directly
-      alert('📲 এই অ্যাপটি ফোনে ইনস্টল করতে: ব্রাউজারের ৩-ডট মেনু (⋮) ট্যাপ করে "Install app" অথবা "Add to Home screen" চাপুন!');
+      setShowGuide(true);
       return;
     }
 
@@ -162,59 +161,88 @@ export function SecretPWAWidget() {
           </div>
           <div>
             <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-              <span>RU Insiders & Life OS App</span>
+              <span>RU Insiders & Life OS Mobile Hub</span>
               <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
                 🔒 Private Node
               </span>
             </h4>
             <span className="text-[10px] text-cyan-300 font-mono">
-              {isInstalled ? '✅ App Currently Installed' : '⚡ 1-Tap Home Screen Install Ready'}
+              {isInstalled ? '✅ App Currently Installed' : '⚡ 2 Ways to Get App: Direct APK or 1-Tap PWA'}
             </span>
           </div>
         </div>
 
         <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
           <Zap className="w-3 h-3 animate-pulse"/>
-          <span>3× Faster Cache</span>
+          <span>3× Faster Offline Cache</span>
         </span>
       </div>
 
       <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-        শুধুমাত্র আপনার প্রাইভেট কন্ট্রোল রুম থেকে অ্যাক্সেসযোগ্য। প্লে-স্টোরের মতো অফলাইনে ইনস্ট্যান্ট লোড হবে।
+        ফোনে সরাসরি অ্যান্ড্রয়েড APK ডাউনলোড করুন অথবা ক্রোম ব্রাউজার থেকে প্লে-স্টোরের মতো হোমস্ক্রিনে ইনস্টল করে নিন।
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Action Buttons: 1) Direct APK Download 2) 1-Tap PWA Install */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        {/* Direct APK Download Link */}
+        <motion.a
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          href="/kmmahim-life-os.apk"
+          download="kmmahim-life-os.apk"
+          className="flex-1 py-2 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-xs font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5"/>
+          <span>📥 Direct Android APK ডাউনলোড (.apk)</span>
+        </motion.a>
+
+        {/* PWA 1-Tap Install */}
         {!isInstalled ? (
           <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            animate={{
-              boxShadow: [
-                '0 0 0 rgba(79, 70, 229, 0)',
-                '0 0 15px rgba(79, 70, 229, 0.4)',
-                '0 0 0 rgba(79, 70, 229, 0)',
-              ],
-            }}
-            transition={{ repeat: Infinity, duration: 2.2 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={handleInstallClick}
             disabled={isInstalling}
             className="flex-1 py-2 px-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-xs font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 animate-bounce"/>
-            <span>📲 ফোনে অ্যাপ হিসেবে ইনস্টল করুন (1-Tap)</span>
+            <Smartphone className="w-3.5 h-3.5 animate-bounce"/>
+            <span>⚡ হোমস্ক্রিনে অ্যাপ ইনস্টল (PWA)</span>
           </motion.button>
         ) : (
           <div className="flex-1 py-2 px-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400"/>
-            <span>Installed & Offline Synchronized</span>
+            <span>PWA Active on Device</span>
           </div>
         )}
-
-        <div className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-1">
-          <ShieldCheck className="w-3 h-3 text-indigo-400"/>
-          <span>Gated Panel</span>
-        </div>
       </div>
+
+      {/* Browser Guide Accordion if beforeinstallprompt is waiting */}
+      {showGuide && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mt-3 p-3 rounded-xl bg-slate-950/90 border border-indigo-500/30 text-xs space-y-1.5"
+        >
+          <div className="flex items-center justify-between text-cyan-300 font-bold text-[11px]">
+            <span>📲 ব্রাউজার থেকে ইনস্টল করার সহজ নিয়ম:</span>
+            <button
+              onClick={() => setShowGuide(false)}
+              className="text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 text-[10px]"
+            >
+              ✕ Close
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-300">
+            • <strong>Chrome (Android):</strong> উপরে ডানের ৩-ডট মেনু (⋮) ট্যাপ করে <strong>"Install app"</strong> অথবা <strong>"Add to Home screen"</strong> চাপুন।
+          </p>
+          <p className="text-[11px] text-slate-300">
+            • <strong>Safari (iPhone):</strong> নিচের শেয়ার বাটন (⎙) ট্যাপ করে <strong>"Add to Home Screen"</strong> চাপুন।
+          </p>
+          <p className="text-[11px] text-emerald-400">
+            • <strong>অথবা:</strong> বামদিকের সবুজ <strong>"📥 Direct Android APK ডাউনলোড"</strong> বাটনে ট্যাপ করে সরাসরি APK ইনস্টল করে নিন!
+          </p>
+        </motion.div>
+      )}
     </motion.div>
   );
 }
