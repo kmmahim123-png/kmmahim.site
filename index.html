@@ -22,13 +22,22 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration (Web Only - Disabled in native Android/Capacitor) -->
     <script>
-      if ('serviceWorker' in navigator) {
+      const isNativeApp = window.Capacitor !== undefined || 
+                          window.location.protocol === 'capacitor:' || 
+                          window.location.hostname === 'localhost';
+
+      if ('serviceWorker' in navigator && !isNativeApp) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('PWA Service Worker registered successfully:', reg.scope))
+            .then((reg) => console.log('PWA Service Worker registered:', reg.scope))
             .catch((err) => console.warn('PWA Service Worker registration failed:', err));
+        });
+      } else if (isNativeApp && 'serviceWorker' in navigator) {
+        // Unregister any accidental service worker inside native WebView
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (let reg of registrations) reg.unregister();
         });
       }
     </script>
