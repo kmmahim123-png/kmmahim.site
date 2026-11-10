@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import SafeDeleteModal from './common/SafeDeleteModal';
 import { SoundFX } from './common/SoundEffects';
 import {
-  Utensils, Calendar, Plus, CheckCircle2, Coins, Calculator,
-  Sparkles, History, Trash2, RotateCcw, Flame, ArrowRight
+  Utensils, Coins, Calculator, History, Trash2
 } from 'lucide-react';
 
 export default function MealManager() {
@@ -15,8 +15,7 @@ export default function MealManager() {
     deleteMealDeposit,
     updateDailyMeal,
     deleteMealLog,
-    resetMealsData,
-    hasDemoData
+    resetMealsData
   } = useOS();
 
   const { mode, ratePerMeal, packageTotalMeals, deposits, logs } = data.meals;
@@ -35,8 +34,8 @@ export default function MealManager() {
   const [messTotalBazar, setMessTotalBazar] = useState('');
   const [messTotalMeals, setMessTotalMeals] = useState('');
 
-  // Confirm Reset
-  const [confirmReset, setConfirmReset] = useState(false);
+  // Protected Safe Delete Modal
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const currentLog = logs[selectedDate] || { breakfast: 0, lunch: 0, dinner: 0, guest: 0 };
 
@@ -114,50 +113,18 @@ export default function MealManager() {
     setShowBazarCalc(false);
   };
 
-  const handleResetMonth = () => {
-    if (!confirmReset) {
-      SoundFX.click();
-      setConfirmReset(true);
-      setTimeout(() => setConfirmReset(false), 4000);
-      return;
-    }
-    SoundFX.laser();
-    resetMealsData();
-    setConfirmReset(false);
-  };
-
   const quickDepositAmounts = [500, 1000, 1500, 2000, 3000];
 
   return (
     <div className="space-y-6">
-      {/* Demo Data Notice */}
-      {hasDemoData && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-indigo-500/15 border border-amber-500/40 backdrop-blur-xl flex flex-wrap items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-3 text-xs">
-            <Sparkles className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
-            <div>
-              <strong className="text-amber-300 block text-sm">এগুলো আনুমানিক ডেমো মিল ডেটা!</strong>
-              <span className="text-slate-300">
-                নিজের আসল জমার টাকা এবং প্রতিদিনের মিল হিসাব শুরু করতে নিচের বাটনে ক্লিক করে পুরানো ডেটা মুছে ফেলুন।
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              SoundFX.laser();
-              resetMealsData();
-            }}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-rose-900/40 transition active:scale-95"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>ডেমো মুছে ০ থেকে শুরু করুন</span>
-          </button>
-        </motion.div>
-      )}
+      {/* Protected Reset Meal Modal */}
+      <SafeDeleteModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={() => resetMealsData()}
+        title="মিলের হিসাব রিসেট (০)"
+        description="আপনি কি আসলেই সব মিল জমার হিসাব এবং প্রতিদিনের মিল লগ মুছে ফেলতে চান?"
+      />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -197,18 +164,6 @@ export default function MealManager() {
               মাসিক মিল প্যাকেজ
             </button>
           </div>
-
-          <button
-            onClick={handleResetMonth}
-            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border ${
-              confirmReset
-                ? 'bg-rose-600 border-rose-400 text-white animate-pulse'
-                : 'glass-pill text-rose-400 hover:bg-rose-500/20'
-            }`}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{confirmReset ? 'নিশ্চিত? (Click Again)' : 'নতুন মাস (Reset 0)'}</span>
-          </button>
         </div>
       </div>
 
@@ -698,6 +653,20 @@ export default function MealManager() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Subtle Bottom-Right Protected Reset Link */}
+      <div className="flex justify-end pt-4">
+        <button
+          onClick={() => {
+            SoundFX.click();
+            setShowResetModal(true);
+          }}
+          className="text-[11px] text-slate-500 hover:text-rose-400 flex items-center gap-1.5 transition"
+        >
+          <Trash2 className="w-3 h-3" />
+          <span>Reset Meal Month Data (Protected)</span>
+        </button>
       </div>
     </div>
   );

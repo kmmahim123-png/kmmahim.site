@@ -2,10 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
 import { AnimatedCounter, TiltCard, CircularFinanceDonut } from './common/MotionKit';
+import SafeDeleteModal from './common/SafeDeleteModal';
 import { SoundFX } from './common/SoundEffects';
 import {
   Wallet, PlusCircle, CheckCircle2, PieChart, Landmark, Smartphone,
-  Banknote, Users, Pencil, Check, X, Trash2, ArrowRightLeft, RotateCcw, Sparkles
+  Banknote, Users, Pencil, Check, X, Trash2, ArrowRightLeft,
+  Calendar as CalendarIcon, List, TrendingUp, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 export default function FinanceManager() {
@@ -18,8 +20,7 @@ export default function FinanceManager() {
     addDebt,
     toggleDebtSettled,
     deleteDebt,
-    resetFinanceData,
-    hasDemoData
+    resetFinanceData
   } = useOS();
 
   const { wallets, transactions, debts } = data.finance;
@@ -36,7 +37,12 @@ export default function FinanceManager() {
   const [category, setCategory] = useState('Food & Meal');
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [timeFilter, setTimeFilter] = useState('all'); // 'today' | 'week' | 'month' | 'all'
+  const [timeFilter, setTimeFilter] = useState('all'); // 'today' | 'week' | 'month' | 'year' | 'all'
+
+  // History View Mode: 'list' | 'calendar'
+  const [historyView, setHistoryView] = useState('list');
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [selectedCalDate, setSelectedCalDate] = useState(null);
 
   // Debt Form State
   const [person, setPerson] = useState('');
@@ -44,28 +50,78 @@ export default function FinanceManager() {
   const [debtAmount, setDebtAmount] = useState('');
   const [debtNote, setDebtNote] = useState('');
 
-  // Confirm Reset
-  const [confirmReset, setConfirmReset] = useState(false);
+  // Protected Safe Delete Modal
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const totalBalance = Object.values(wallets).reduce((sum, val) => sum + Number(val || 0), 0);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const currentMonthStr = todayStr.slice(0, 7);
+  const currentYearStr = todayStr.slice(0, 4);
+
+  // Compute Simultaneous All-Horizon Stats (Today, Week, Month, Year)
+  const horizonStats = useMemo(() => {
+    const now = new Date();
+    const res = {
+      today: { in: 0, out: 0 },
+      week: { in: 0, out: 0 },
+      month: { in: 0, out: 0 },
+      year: { in: 0, out: 0 }
+    };
+
+    transactions.forEach((tx) => {
+      if (tx.category === 'Wallet Transfer') return;
+      const amt = Number(tx.amount || 0);
+      const isIncome = tx.type === 'in';
+      const txDate = new Date(tx.date);
+      const diffDays = (now - txDate) / (1000 * 60 * 60 * 24);
+
+      if (tx.date === todayStr) {
+        if (isIncome) res.today.in += amt;
+        else res.today.out += amt;
+      }
+      if (diffDays >= -0.5 && diffDays <= 7) {
+        if (isIncome) res.week.in += amt;
+        else res.week.out += amt;
+      }
+      if (tx.date.slice(0, 7) === currentMonthStr) {
+        if (isIncome) res.month.in += amt;
+        else res.month.out += amt;
+      }
+      if (tx.date.slice(0, 4) === currentYearStr) {
+        if (isIncome) res.year.in += amt;
+        else res.year.out += amt;
+      }
+    });
+
+    return res;
+  }, [transactions, todayStr, currentMonthStr, currentYearStr]);
+
+  // Yearly Income Source Breakdown
+  const yearlyIncomeSources = useMemo(() => {
+    const map = {};
+    transactions
+      .filter((t) => t.type === 'in' && t.category !== 'Wallet Transfer' && t.date.slice(0, 4) === currentYearStr)
+      .forEach((t) => {
+        map[t.category] = (map[t.category] || 0) + t.amount;
+      });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [transactions, currentYearStr]);
 
   const filteredTransactions = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
     const now = new Date();
-
     return transactions.filter((tx) => {
+      if (selectedCalDate) return tx.date === selectedCalDate;
       if (timeFilter === 'today') return tx.date === todayStr;
       if (timeFilter === 'week') {
         const txDate = new Date(tx.date);
         const diffDays = (now - txDate) / (1000 * 60 * 60 * 24);
-        return diffDays <= 7;
+        return diffDays >= -0.5 && diffDays <= 7;
       }
-      if (timeFilter === 'month') {
-        return tx.date.slice(0, 7) === todayStr.slice(0, 7);
-      }
+      if (timeFilter === 'month') return tx.date.slice(0, 7) === currentMonthStr;
+      if (timeFilter === 'year') return tx.date.slice(0, 4) === currentYearStr;
       return true;
     });
-  }, [transactions, timeFilter]);
+  }, [transactions, timeFilter, selectedCalDate, todayStr, currentMonthStr, currentYearStr]);
 
   const totalIn = filteredTransactions
     .filter((t) => t.type === 'in' && t.category !== 'Wallet Transfer')
@@ -84,6 +140,42 @@ export default function FinanceManager() {
       });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [filteredTransactions]);
+
+  // Calendar grid generation for calendarMonth (YYYY-MM)
+  const calendarDays = useMemo(() => {
+    const [yr, mo] = calendarMonth.split('-').map(Number);
+    const firstDay = new Date(yr, mo - 1, 1);
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const startWeekday = firstDay.getDay(); // 0=Sun..6=Sat
+
+    const dayTotals = {};
+    transactions.forEach((tx) => {
+      if (!tx.date.startsWith(calendarMonth) || tx.category === 'Wallet Transfer') return;
+      if (!dayTotals[tx.date]) dayTotals[tx.date] = { in: 0, out: 0 };
+      if (tx.type === 'in') dayTotals[tx.date].in += tx.amount;
+      else dayTotals[tx.date].out += tx.amount;
+    });
+
+    const cells = [];
+    for (let i = 0; i < startWeekday; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${calendarMonth}-${String(d).padStart(2, '0')}`;
+      cells.push({
+        day: d,
+        dateKey,
+        stats: dayTotals[dateKey] || null
+      });
+    }
+    return cells;
+  }, [calendarMonth, transactions]);
+
+  const shiftCalendarMonth = (offset) => {
+    const [yr, mo] = calendarMonth.split('-').map(Number);
+    const d = new Date(yr, mo - 1 + offset, 1);
+    const nextStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    setCalendarMonth(nextStr);
+    setSelectedCalDate(null);
+  };
 
   const handleStartEditWallet = (key, currentVal) => {
     SoundFX.click();
@@ -125,18 +217,6 @@ export default function FinanceManager() {
     setDebtNote('');
   };
 
-  const handleResetAll = () => {
-    if (!confirmReset) {
-      SoundFX.click();
-      setConfirmReset(true);
-      setTimeout(() => setConfirmReset(false), 4000);
-      return;
-    }
-    SoundFX.laser();
-    resetFinanceData();
-    setConfirmReset(false);
-  };
-
   const walletMeta = [
     { key: 'cash', label: 'Hand Cash', icon: Banknote, color: 'from-emerald-500 to-teal-600' },
     { key: 'bkash', label: 'bKash Wallet', icon: Smartphone, color: 'from-pink-500 to-rose-600' },
@@ -144,102 +224,106 @@ export default function FinanceManager() {
     { key: 'bank', label: 'Bank Account', icon: Landmark, color: 'from-indigo-500 to-blue-600' }
   ];
 
-  const categories = [
+  const expenseCategories = [
     'Food & Meal',
     'Transport & Varsity',
     'Gym & Fitness',
     'Study & Academic',
     'Business / JACKFRU',
-    'Client Project',
     'Personal & Care',
     'Tech & AI APIs',
     'Other'
   ];
 
+  const incomeCategories = [
+    'Client Project',
+    'Business / JACKFRU',
+    'Freelance / Coding',
+    'Family / Allowance',
+    'Investment / Profit',
+    'Other Income'
+  ];
+
+  const activeCategories = txMode === 'in' ? incomeCategories : expenseCategories;
   const quickAmounts = [50, 100, 200, 500, 1000];
 
   return (
     <div className="space-y-6">
-      {/* Demo Data Alert Banner */}
-      {hasDemoData && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-indigo-500/15 border border-amber-500/40 backdrop-blur-xl flex flex-wrap items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-3 text-xs">
-            <Sparkles className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
-            <div>
-              <strong className="text-amber-300 block text-sm">এগুলো আনুমানিক স্যাম্পল/ডেমো ডেটা!</strong>
-              <span className="text-slate-300">
-                আপনি চাইলে প্রতিটি কার্ডের <strong>✏️ পেন্সিল আইকনে</strong> ট্যাপ করে নিজের আসল টাকা বসাতে পারেন অথবা এক ক্লিকে সব ডেমো মুছে ০৳ থেকে শুরু করতে পারেন।
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              SoundFX.laser();
-              resetFinanceData();
-            }}
-            className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-rose-900/40 transition active:scale-95"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>সব ডেমো মুছে ০৳ করুন</span>
-          </button>
-        </motion.div>
-      )}
+      {/* Protected Reset Finance Modal */}
+      <SafeDeleteModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={() => resetFinanceData()}
+        title="ফাইন্যান্স ডেটা রিসেট (০৳)"
+        description="আপনি কি আসলেই সব ওয়ালেট ব্যালেন্স ০৳ করতে এবং সকল লেনদেন ও ধারের হিসাব ডিলিট করতে চান?"
+      />
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-black flex items-center gap-2.5 text-white">
             <Wallet className="w-6 h-6 text-emerald-400" />
-            <span>Money & Multi-Wallet Command</span>
+            <span>Money & Timeline Ledger</span>
           </h1>
           <p className="text-xs text-slate-400">
-            ওয়ালেটের আসল টাকা এডিট করুন (✏️), খরচ লিখুন, অথবা bKash ⇄ Cash ট্রান্সফার করুন
+            আজকের তারিখ: <span className="text-cyan-400 font-mono">{todayStr}</span> • দৈনিক, সাপ্তাহিক, মাসিক ও বার্ষিক আয়-ব্যয় ট্র্যাকার
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Time Filter */}
-          <div className="flex items-center gap-1 glass-pill p-1 rounded-xl">
-            {[
-              { id: 'today', label: 'আজ' },
-              { id: 'week', label: '৭ দিন' },
-              { id: 'month', label: 'মাস' },
-              { id: 'all', label: 'সব' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  SoundFX.click();
-                  setTimeFilter(tab.id);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                  timeFilter === tab.id
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        {/* Time Filter */}
+        <div className="flex flex-wrap items-center gap-1 glass-pill p-1 rounded-xl">
+          {[
+            { id: 'today', label: 'আজ' },
+            { id: 'week', label: 'সপ্তাহ' },
+            { id: 'month', label: 'মাস' },
+            { id: 'year', label: 'বছর' },
+            { id: 'all', label: 'সব' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                SoundFX.click();
+                setSelectedCalDate(null);
+                setTimeFilter(tab.id);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                timeFilter === tab.id && !selectedCalDate
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {/* Reset Button */}
-          <button
-            onClick={handleResetAll}
-            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border ${
-              confirmReset
-                ? 'bg-rose-600 border-rose-400 text-white animate-pulse'
-                : 'glass-pill text-rose-400 hover:bg-rose-500/20'
+      {/* ALL-IN-ONE TIME HORIZON MATRIX (Today / Week / Month / Year at a glance) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { key: 'today', title: `📅 আজ (${todayStr})`, stats: horizonStats.today, color: 'text-cyan-300' },
+          { key: 'week', title: '📆 এই সপ্তাহ (৭ দিন)', stats: horizonStats.week, color: 'text-indigo-300' },
+          { key: 'month', title: `🗓️ এই মাস (${currentMonthStr})`, stats: horizonStats.month, color: 'text-emerald-300' },
+          { key: 'year', title: `📊 এই বছর (${currentYearStr})`, stats: horizonStats.year, color: 'text-amber-300' }
+        ].map((item) => (
+          <div
+            key={item.key}
+            onClick={() => {
+              SoundFX.click();
+              setSelectedCalDate(null);
+              setTimeFilter(item.key);
+            }}
+            className={`glass-crystal rounded-2xl p-4 cursor-pointer transition hover:border-white/25 ${
+              timeFilter === item.key && !selectedCalDate ? 'border-indigo-500/60 bg-indigo-950/20' : ''
             }`}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>{confirmReset ? 'নিশ্চিত মুছবেন? (Click)' : 'Clear All (0৳)'}</span>
-          </button>
-        </div>
+            <span className={`text-[11px] font-bold block mb-2 ${item.color}`}>{item.title}</span>
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-emerald-400">+৳{item.stats.in.toLocaleString()}</span>
+              <span className="text-rose-400">-৳{item.stats.out.toLocaleString()}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Circular Donut + Editable Wallet Cards */}
@@ -273,7 +357,6 @@ export default function FinanceManager() {
                     <span className="text-xs text-slate-200 font-bold">{w.label}</span>
                   </div>
 
-                  {/* Direct Balance Edit Button */}
                   {!isEditing ? (
                     <button
                       onClick={() => handleStartEditWallet(w.key, bal)}
@@ -333,7 +416,7 @@ export default function FinanceManager() {
         </div>
       </div>
 
-      {/* Add Transaction / Transfer + Breakdown */}
+      {/* Add Transaction / Transfer + Breakdown & Calendar */}
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Form Card */}
         <form
@@ -346,13 +429,13 @@ export default function FinanceManager() {
               <span>নতুন হিসাব এন্ট্রি করুন</span>
             </h3>
 
-            {/* Mode Switcher */}
             <div className="flex glass-pill p-1 rounded-xl text-[11px]">
               <button
                 type="button"
                 onClick={() => {
                   SoundFX.click();
                   setTxMode('out');
+                  setCategory(expenseCategories[0]);
                 }}
                 className={`px-2.5 py-1 rounded-lg font-bold transition ${
                   txMode === 'out' ? 'bg-rose-600 text-white' : 'text-slate-400'
@@ -365,6 +448,7 @@ export default function FinanceManager() {
                 onClick={() => {
                   SoundFX.click();
                   setTxMode('in');
+                  setCategory(incomeCategories[0]);
                 }}
                 className={`px-2.5 py-1 rounded-lg font-bold transition ${
                   txMode === 'in' ? 'bg-emerald-600 text-white' : 'text-slate-400'
@@ -388,35 +472,29 @@ export default function FinanceManager() {
             </div>
           </div>
 
-          {/* Quick Amount Tap Chips */}
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase font-mono block mb-1.5">
-              Quick Amount Tap:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {quickAmounts.map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => {
-                    SoundFX.click();
-                    setAmount(String((Number(amount) || 0) + amt));
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-indigo-500/30 border border-white/10 text-[11px] font-bold text-cyan-300 transition active:scale-95"
-                >
-                  +৳{amt}
-                </button>
-              ))}
-              {amount && (
-                <button
-                  type="button"
-                  onClick={() => setAmount('')}
-                  className="px-2 py-1 rounded-lg bg-rose-500/10 text-[11px] text-rose-400"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {quickAmounts.map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => {
+                  SoundFX.click();
+                  setAmount(String((Number(amount) || 0) + amt));
+                }}
+                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-indigo-500/30 border border-white/10 text-[11px] font-bold text-cyan-300 transition active:scale-95"
+              >
+                +৳{amt}
+              </button>
+            ))}
+            {amount && (
+              <button
+                type="button"
+                onClick={() => setAmount('')}
+                className="px-2 py-1 rounded-lg bg-rose-500/10 text-[11px] text-rose-400"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -434,7 +512,7 @@ export default function FinanceManager() {
 
             <div>
               <label className="text-[11px] text-slate-400 block mb-1">
-                {txMode === 'transfer' ? 'কোন ওয়ালেট থেকে (From)' : 'কোন ওয়ালেট?'}
+                {txMode === 'transfer' ? 'কোন ওয়ালেট থেকে' : 'কোন ওয়ালেট?'}
               </label>
               <select
                 value={wallet}
@@ -451,7 +529,7 @@ export default function FinanceManager() {
 
           {txMode === 'transfer' ? (
             <div>
-              <label className="text-[11px] text-slate-400 block mb-1">কোন ওয়ালেটে যাবে (To Wallet)</label>
+              <label className="text-[11px] text-slate-400 block mb-1">কোন ওয়ালেটে যাবে (To)</label>
               <select
                 value={toWallet}
                 onChange={(e) => setToWallet(e.target.value)}
@@ -466,13 +544,15 @@ export default function FinanceManager() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">খাত / ক্যাটাগরি</label>
+                <label className="text-[11px] text-slate-400 block mb-1">
+                  {txMode === 'in' ? 'ইনকাম সোর্স (Source)' : 'খরচের খাত (Category)'}
+                </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
                 >
-                  {categories.map((c) => (
+                  {activeCategories.map((c) => (
                     <option key={c} value={c} className="bg-slate-900">{c}</option>
                   ))}
                 </select>
@@ -493,7 +573,7 @@ export default function FinanceManager() {
             <label className="text-[11px] text-slate-400 block mb-1">নোট / বিবরণ</label>
             <input
               type="text"
-              placeholder={txMode === 'transfer' ? 'e.g. Cash out from bKash' : 'কী কাজে খরচ বা আয় হলো?'}
+              placeholder={txMode === 'transfer' ? 'e.g. bKash Cash Out' : 'কী কাজে বা কোথা থেকে?'}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs"
@@ -511,49 +591,200 @@ export default function FinanceManager() {
             }`}
           >
             {txMode === 'in'
-              ? '+ ওয়ালেটে টাকা যোগ করুন'
+              ? '+ ইনকাম / জমা সেভ করুন'
               : txMode === 'transfer'
-              ? '⇄ ওয়ালেট ট্রান্সফার সম্পন্ন করুন'
+              ? '⇄ ট্রান্সফার সম্পন্ন করুন'
               : '- খরচ সেভ করুন'}
           </button>
         </form>
 
-        {/* Breakdown & History with Delete Buttons */}
+        {/* Right: History List / Visual Calendar + Category / Income Source Reports */}
         <div className="lg:col-span-7 glass-crystal rounded-3xl p-5 flex flex-col justify-between space-y-5">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-sm flex items-center gap-2 text-white">
-                <PieChart className="w-4 h-4 text-cyan-400" />
-                <span>খরচের বিশ্লেষণ (Category Breakdown)</span>
+          {/* Sub-Header with List / Calendar View Toggle */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <span>
+                {selectedCalDate
+                  ? `📅 ${selectedCalDate} এর লেনদেন`
+                  : `লেনদেনের ইতিহাস (${filteredTransactions.length})`}
+              </span>
+              {selectedCalDate && (
+                <button
+                  onClick={() => setSelectedCalDate(null)}
+                  className="px-2 py-0.5 rounded bg-white/10 text-[10px] text-cyan-300 hover:bg-white/20"
+                >
+                  Clear Date
+                </button>
+              )}
+            </h4>
+
+            <div className="flex items-center gap-1 glass-pill p-1 rounded-xl text-[11px]">
+              <button
+                onClick={() => {
+                  SoundFX.click();
+                  setHistoryView('list');
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition ${
+                  historyView === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400'
+                }`}
+              >
+                <List className="w-3 h-3" />
+                <span>List</span>
+              </button>
+              <button
+                onClick={() => {
+                  SoundFX.click();
+                  setHistoryView('calendar');
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition ${
+                  historyView === 'calendar' ? 'bg-indigo-600 text-white' : 'text-slate-400'
+                }`}
+              >
+                <CalendarIcon className="w-3 h-3" />
+                <span>Calendar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Monthly Calendar View */}
+          {historyView === 'calendar' && (
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => shiftCalendarMonth(-1)}
+                  className="p-1 rounded-lg glass-pill hover:bg-white/10 text-slate-300"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold font-mono text-cyan-300">{calendarMonth}</span>
+                <button
+                  onClick={() => shiftCalendarMonth(1)}
+                  className="p-1 rounded-lg glass-pill hover:bg-white/10 text-slate-300"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-mono text-slate-500">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                  <div key={d}>{d}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((cell, idx) => {
+                  if (!cell) return <div key={idx} className="h-12 rounded-xl" />;
+                  const isSelected = selectedCalDate === cell.dateKey;
+                  const isToday = cell.dateKey === todayStr;
+
+                  return (
+                    <button
+                      key={cell.dateKey}
+                      onClick={() => {
+                        SoundFX.click();
+                        setSelectedCalDate(isSelected ? null : cell.dateKey);
+                      }}
+                      className={`h-12 p-1 rounded-xl border text-left flex flex-col justify-between transition ${
+                        isSelected
+                          ? 'bg-indigo-600/40 border-indigo-400 text-white'
+                          : isToday
+                          ? 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200'
+                          : 'bg-white/[0.02] border-white/5 hover:border-white/20 text-slate-300'
+                      }`}
+                    >
+                      <span className="text-[10px] font-bold leading-none">{cell.day}</span>
+                      {cell.stats && (
+                        <div className="text-[8px] font-mono leading-tight truncate">
+                          {cell.stats.in > 0 && <span className="text-emerald-400 block">+{cell.stats.in}</span>}
+                          {cell.stats.out > 0 && <span className="text-rose-400 block">-{cell.stats.out}</span>}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Transactions List */}
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {filteredTransactions.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-4">কোনো লেনদেন পাওয়া যায়নি।</p>
+            ) : (
+              <AnimatePresence>
+                {filteredTransactions.map((tx) => (
+                  <motion.div
+                    key={tx.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-white/15 text-xs transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                          tx.type === 'in'
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : 'bg-rose-500/15 text-rose-400'
+                        }`}
+                      >
+                        {tx.type === 'in' ? '+' : '-'}
+                      </span>
+                      <div>
+                        <p className="font-bold text-slate-100">{tx.note || tx.category}</p>
+                        <span className="text-[10px] text-slate-400 uppercase font-mono">
+                          {tx.wallet} • {tx.category} • {tx.date}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className={`font-black font-mono ${tx.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {tx.type === 'in' ? '+' : '-'}৳{tx.amount.toLocaleString()}
+                      </span>
+                      <button
+                        onClick={() => {
+                          SoundFX.click();
+                          deleteTransaction(tx.id, true);
+                        }}
+                        title="Delete transaction"
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-600 text-slate-400 hover:text-white transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            )}
+          </div>
+
+          {/* Yearly Income Source Breakdown */}
+          <div className="border-t border-white/10 pt-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-xs flex items-center gap-2 text-emerald-400">
+                <TrendingUp className="w-4 h-4" />
+                <span>এই বছরের ({currentYearStr}) আয়ের উৎসসমূহ</span>
               </h3>
-              <span className="text-xs text-slate-400">
-                মোট খরচ: <strong className="text-rose-400 font-mono">৳{totalOut.toLocaleString()}</strong>
+              <span className="text-xs font-mono text-emerald-300 font-bold">
+                Total: ৳{horizonStats.year.in.toLocaleString()}
               </span>
             </div>
 
-            {categoryBreakdown.length === 0 ? (
-              <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 text-center text-xs text-slate-400">
-                এই সময়ে কোনো খরচ রেকর্ড করা হয়নি। বাম পাশ থেকে প্রথম খরচ যোগ করুন!
-              </div>
+            {yearlyIncomeSources.length === 0 ? (
+              <p className="text-[11px] text-slate-500">এই বছর এখনো কোনো ইনকাম রেকর্ড করা হয়নি।</p>
             ) : (
-              <div className="space-y-2.5">
-                {categoryBreakdown.map(([cat, val]) => {
-                  const pct = totalOut > 0 ? Math.round((val / totalOut) * 100) : 0;
+              <div className="grid sm:grid-cols-2 gap-2.5">
+                {yearlyIncomeSources.map(([src, val]) => {
+                  const pct = horizonStats.year.in > 0 ? Math.round((val / horizonStats.year.in) * 100) : 0;
                   return (
-                    <div key={cat} className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-slate-200 font-medium">{cat}</span>
-                        <span className="text-slate-400 font-mono">
-                          ৳{val.toLocaleString()} ({pct}%)
-                        </span>
+                    <div key={src} className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-slate-200 font-semibold">{src}</span>
+                        <span className="text-emerald-400 font-mono font-bold">৳{val.toLocaleString()} ({pct}%)</span>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-slate-950/80 overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${pct}%` }}
-                          transition={{ duration: 0.7 }}
-                          className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full"
-                        />
+                      <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden">
+                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
@@ -561,83 +792,16 @@ export default function FinanceManager() {
               </div>
             )}
           </div>
-
-          {/* Transaction Log with Delete Button */}
-          <div className="border-t border-white/10 pt-4">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-              লেনদেনের তালিকা ({filteredTransactions.length})
-            </h4>
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {filteredTransactions.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">কোনো লেনদেন নেই</p>
-              ) : (
-                <AnimatePresence>
-                  {filteredTransactions.map((tx) => (
-                    <motion.div
-                      key={tx.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-white/5 hover:border-white/15 text-xs transition group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                            tx.type === 'in'
-                              ? 'bg-emerald-500/15 text-emerald-400'
-                              : 'bg-rose-500/15 text-rose-400'
-                          }`}
-                        >
-                          {tx.type === 'in' ? '+' : '-'}
-                        </span>
-                        <div>
-                          <p className="font-bold text-slate-100">
-                            {tx.note || tx.category}
-                          </p>
-                          <span className="text-[10px] text-slate-400 uppercase font-mono">
-                            {tx.wallet} • {tx.category} • {tx.date}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`font-black font-mono ${
-                            tx.type === 'in' ? 'text-emerald-400' : 'text-rose-400'
-                          }`}
-                        >
-                          {tx.type === 'in' ? '+' : '-'}৳{tx.amount.toLocaleString()}
-                        </span>
-                        <button
-                          onClick={() => {
-                            SoundFX.click();
-                            deleteTransaction(tx.id, true);
-                          }}
-                          title="Delete transaction & revert balance"
-                          className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-600 text-slate-400 hover:text-white transition"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              )}
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Debt & Loan Tracker (কে পাবে / কার কাছে পাবো) */}
+      {/* Debt & Loan Tracker */}
       <div className="glass-crystal rounded-3xl p-5 space-y-4">
         <div>
           <h3 className="font-bold text-sm flex items-center gap-2 text-white">
             <Users className="w-4 h-4 text-amber-400" />
             <span>ধার ও বাকি হিসাব (আমি পাবো / আমার কাছে পাবে)</span>
           </h3>
-          <p className="text-xs text-slate-400">
-            বন্ধু বা দোকানের বাকি হিসাব রাখুন এবং পরিশোধ হলে মুছে ফেলুন বা Settled করুন
-          </p>
         </div>
 
         <form onSubmit={handleAddDebt} className="grid sm:grid-cols-5 gap-3 pt-1">
@@ -674,70 +838,77 @@ export default function FinanceManager() {
             type="submit"
             className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white transition active:scale-95"
           >
-            + হিসাব যোগ করুন
+            + হিসাব যোগ
           </button>
         </form>
 
         <div className="grid md:grid-cols-2 gap-3 pt-2">
-          {debts.length === 0 ? (
-            <p className="text-xs text-slate-500 col-span-2 py-2">কোনো ধার বা বাকি হিসাব নেই।</p>
-          ) : (
-            debts.map((d) => (
-              <div
-                key={d.id}
-                className={`p-3.5 rounded-2xl border flex items-center justify-between transition ${
-                  d.settled
-                    ? 'bg-slate-950/30 border-white/5 opacity-55'
-                    : 'bg-slate-950/70 border-white/10'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white">{d.person}</span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                        d.type === 'receivable'
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                      }`}
-                    >
-                      {d.type === 'receivable' ? 'আমি পাবো' : 'আমার কাছে পাবে'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{d.note || d.dueDate}</p>
-                </div>
-
+          {debts.map((d) => (
+            <div
+              key={d.id}
+              className={`p-3.5 rounded-2xl border flex items-center justify-between transition ${
+                d.settled ? 'bg-slate-950/30 border-white/5 opacity-55' : 'bg-slate-950/70 border-white/10'
+              }`}
+            >
+              <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white font-mono">৳{d.amount.toLocaleString()}</span>
-                  <button
-                    onClick={() => {
-                      SoundFX.click();
-                      toggleDebtSettled(d.id);
-                    }}
-                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition ${
-                      d.settled
-                        ? 'bg-slate-800 text-slate-400'
-                        : 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600 hover:text-white'
+                  <span className="font-bold text-sm text-white">{d.person}</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                      d.type === 'receivable'
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                     }`}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{d.settled ? 'Settled' : 'Done'}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      SoundFX.click();
-                      deleteDebt(d.id);
-                    }}
-                    title="Delete record"
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-600 text-slate-400 hover:text-white transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    {d.type === 'receivable' ? 'আমি পাবো' : 'আমার কাছে পাবে'}
+                  </span>
                 </div>
+                <p className="text-xs text-slate-400 mt-0.5">{d.note || d.dueDate}</p>
               </div>
-            ))
-          )}
+
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-white font-mono">৳{d.amount.toLocaleString()}</span>
+                <button
+                  onClick={() => {
+                    SoundFX.click();
+                    toggleDebtSettled(d.id);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition ${
+                    d.settled
+                      ? 'bg-slate-800 text-slate-400'
+                      : 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600 hover:text-white'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{d.settled ? 'Settled' : 'Done'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    SoundFX.click();
+                    deleteDebt(d.id);
+                  }}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-rose-600 text-slate-400 hover:text-white transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
+      </div>
+
+      {/* Subtle Bottom-Right Protected Reset Link */}
+      <div className="flex justify-end pt-4">
+        <button
+          onClick={() => {
+            SoundFX.click();
+            setShowResetModal(true);
+          }}
+          className="text-[11px] text-slate-500 hover:text-rose-400 flex items-center gap-1.5 transition"
+        >
+          <Trash2 className="w-3 h-3" />
+          <span>Reset Finance Data (Protected)</span>
+        </button>
       </div>
     </div>
   );

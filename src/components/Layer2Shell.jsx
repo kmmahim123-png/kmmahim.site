@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
-import { SecretPWAWidget } from './common/MotionKit';
 import SupabaseSyncModal from './common/SupabaseSyncModal';
+import SafeDeleteModal from './common/SafeDeleteModal';
 import { SoundFX } from './common/SoundEffects';
+import { downloadFullOSBackupJSON, downloadCalendarCSV } from '../utils/exportData';
 import CommandOverview from './CommandOverview';
 import FinanceManager from './FinanceManager';
 import MealManager from './MealManager';
@@ -15,7 +16,7 @@ import AgentHub from './AgentHub';
 import {
   Wallet, Utensils, CheckSquare, Lightbulb,
   Share2, Bot, MessageSquare, Globe, Plus, Target,
-  Cloud, SlidersHorizontal, LayoutDashboard, Trash2
+  Cloud, LayoutDashboard, Trash2, Download, Upload, FileSpreadsheet, Smartphone
 } from 'lucide-react';
 
 export default function Layer2Shell() {
@@ -26,12 +27,16 @@ export default function Layer2Shell() {
     addProject,
     deleteProject,
     deleteMessage,
+    resetAllPersonalOSData,
+    restoreFromJSONBackup,
     syncStatus
   } = useOS();
 
   const [activeTab, setActiveTab] = useState('overview');
   const [showSyncModal, setShowSyncModal] = useState(false);
-  const [mobileIconOnly, setMobileIconOnly] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [importNotice, setImportNotice] = useState('');
+  const fileInputRef = useRef(null);
 
   const [nowInput, setNowInput] = useState(data.profile.nowStatus);
   const [projTitle, setProjTitle] = useState('');
@@ -62,70 +67,39 @@ export default function Layer2Shell() {
     setProjMetrics('');
   };
 
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        const ok = restoreFromJSONBackup(parsed);
+        if (ok) {
+          SoundFX.success();
+          setImportNotice('✅ ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!');
+          setTimeout(() => setImportNotice(''), 4000);
+        } else {
+          alert('Invalid backup format.');
+        }
+      } catch {
+        alert('Could not parse JSON backup file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const navItems = [
-    {
-      id: 'overview',
-      label: 'Command Cockpit',
-      shortLabel: 'Home',
-      icon: LayoutDashboard,
-      activeColor: 'text-cyan-400'
-    },
-    {
-      id: 'finance',
-      label: 'Money & Wallets',
-      shortLabel: 'Money',
-      icon: Wallet,
-      activeColor: 'text-emerald-400'
-    },
-    {
-      id: 'meals',
-      label: 'Smart Meal Manager',
-      shortLabel: 'Meals',
-      icon: Utensils,
-      activeColor: 'text-amber-400'
-    },
-    {
-      id: 'habits',
-      label: 'Gym, Namaz & Minoxidil',
-      shortLabel: 'Habits',
-      icon: CheckSquare,
-      activeColor: 'text-rose-400'
-    },
-    {
-      id: 'goals',
-      label: 'Study & Goals',
-      shortLabel: 'Goals',
-      icon: Target,
-      activeColor: 'text-violet-400'
-    },
-    {
-      id: 'ideas',
-      label: 'Chulbul Idea Vault',
-      shortLabel: 'Ideas',
-      icon: Lightbulb,
-      activeColor: 'text-yellow-400'
-    },
-    {
-      id: 'social',
-      label: 'Social Auto-Poster',
-      shortLabel: 'Social',
-      icon: Share2,
-      activeColor: 'text-pink-400'
-    },
-    {
-      id: 'agents',
-      label: 'OpenClaw, Grok & Hermes',
-      shortLabel: 'AI Hub',
-      icon: Bot,
-      activeColor: 'text-blue-400'
-    },
-    {
-      id: 'cms',
-      label: 'Layer-1 Control & Inbox',
-      shortLabel: 'Inbox',
-      icon: MessageSquare,
-      activeColor: 'text-indigo-400'
-    }
+    { id: 'overview', label: 'Home', fullLabel: 'Command Cockpit', icon: LayoutDashboard, color: 'text-cyan-400' },
+    { id: 'finance', label: 'Money', fullLabel: 'Money & Wallets', icon: Wallet, color: 'text-emerald-400' },
+    { id: 'meals', label: 'Food', fullLabel: 'Smart Meal Manager', icon: Utensils, color: 'text-amber-400' },
+    { id: 'habits', label: 'Habits', fullLabel: 'Daily Habits', icon: CheckSquare, color: 'text-rose-400' },
+    { id: 'goals', label: 'Goals', fullLabel: 'Goals & Timers', icon: Target, color: 'text-violet-400' },
+    { id: 'ideas', label: 'Ideas', fullLabel: 'Idea Galaxy', icon: Lightbulb, color: 'text-yellow-400' },
+    { id: 'social', label: 'Social', fullLabel: 'Social Poster', icon: Share2, color: 'text-pink-400' },
+    { id: 'agents', label: 'AI Hub', fullLabel: 'OpenClaw & Grok', icon: Bot, color: 'text-blue-400' },
+    { id: 'cms', label: 'Inbox', fullLabel: 'Site Control & Inbox', icon: MessageSquare, color: 'text-indigo-400' }
   ];
 
   const handleTabChange = (tabId) => {
@@ -134,7 +108,7 @@ export default function Layer2Shell() {
   };
 
   return (
-    <div className="min-h-screen bg-[#04060c] text-slate-100 flex flex-col md:flex-row relative selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#04060c] text-slate-100 flex flex-col relative selection:bg-indigo-500 selection:text-white overflow-x-hidden">
       {/* Classical Crystal Aurora Ambient Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-indigo-600/20 blur-[120px] animate-aurora" />
@@ -142,55 +116,71 @@ export default function Layer2Shell() {
         <div className="absolute -bottom-32 left-1/3 w-[400px] h-[400px] rounded-full bg-emerald-500/10 blur-[110px] animate-aurora" />
       </div>
 
-      {/* Supabase Cloud Sync & Data Management Modal */}
+      {/* Supabase Sync Modal */}
       <SupabaseSyncModal
         isOpen={showSyncModal}
         onClose={() => setShowSyncModal(false)}
       />
 
-      {/* DESKTOP SIDEBAR (>= md screens) */}
-      <aside className="hidden md:flex w-64 bg-slate-950/75 backdrop-blur-2xl border-r border-white/10 p-4 flex-col justify-between shrink-0 sticky top-0 h-screen z-20">
-        <div className="space-y-4">
-          {/* Logo & Status */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+      {/* Protected Wipe All OS Data Modal (Type DELETE to confirm) */}
+      <SafeDeleteModal
+        isOpen={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={() => resetAllPersonalOSData()}
+        title="সব পার্সোনাল ডেটা ডিলিট (Factory Wipe)"
+        description="আপনি কি আপনার ওয়ালেট, লেনদেন, মিল, হ্যাবিট, গোল এবং সব আইডিয়া সম্পূর্ণ মুছে ০ করতে চান?"
+      />
+
+      {/* TOP CIRCULAR CRYSTAL ORBITAL BAR (All Screens: Sleek Circle Buttons!) */}
+      <header className="sticky top-0 z-30 bg-slate-950/75 backdrop-blur-2xl border-b border-white/10 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-4 pt-2.5 pb-2">
+          {/* Top Utility Strip */}
+          <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-white/5">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-black text-sm shadow-lg shadow-indigo-600/30">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-black text-xs shadow-lg shadow-indigo-600/30 border border-white/20">
                 OS
               </div>
               <div>
-                <h2 className="text-sm font-bold leading-none text-white tracking-wide">Mahim Life OS</h2>
-                <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 mt-1">
+                <h2 className="text-xs sm:text-sm font-bold leading-none text-white tracking-wide">
+                  Mahim Life OS
+                </h2>
+                <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  CRYSTAL ENGINE
+                  CRYSTAL ORBITAL SYSTEM
                 </span>
               </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  SoundFX.click();
+                  setShowSyncModal(true);
+                }}
+                className="px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 hover:border-emerald-400 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 transition"
+              >
+                <Cloud className="w-3.5 h-3.5 animate-pulse" />
+                <span className="hidden sm:inline">
+                  {syncStatus.status === 'success' ? 'Cloud Synced' : 'Supabase Sync'}
+                </span>
+                <span className="sm:hidden">Cloud</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  SoundFX.click();
+                  setActiveLayer('public');
+                }}
+                className="px-3 py-1.5 rounded-full glass-pill hover:bg-white/10 text-cyan-400 text-[11px] font-bold flex items-center gap-1.5 transition"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Public Site</span>
+              </button>
+            </div>
           </div>
 
-          {/* Supabase Quick Status Card */}
-          <button
-            onClick={() => {
-              SoundFX.click();
-              setShowSyncModal(true);
-            }}
-            className="w-full p-2.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-slate-900/60 border border-emerald-500/30 hover:border-emerald-400/60 backdrop-blur-xl transition flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2">
-              <Cloud className="w-4 h-4 text-emerald-400 group-hover:animate-bounce" />
-              <div className="text-left">
-                <div className="text-[11px] font-bold text-emerald-300">Supabase Cloud</div>
-                <div className="text-[9px] text-slate-400">
-                  {syncStatus.status === 'success' ? 'Synced & Safe' : 'Backup & Manage'}
-                </div>
-              </div>
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-semibold">
-              Sync
-            </span>
-          </button>
-
-          {/* Desktop Navigation Items */}
-          <div className="space-y-1">
+          {/* CIRCULAR NAVIGATION BAR (Home, Money, Food, Habits, Goals, Ideas...) */}
+          <nav className="pt-2.5 pb-1 overflow-x-auto no-scrollbar flex items-center sm:justify-center gap-3.5 sm:gap-5">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -198,149 +188,42 @@ export default function Layer2Shell() {
                 <button
                   key={item.id}
                   onClick={() => handleTabChange(item.id)}
-                  className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group overflow-hidden ${
-                    isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                  }`}
+                  title={item.fullLabel}
+                  className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer focus:outline-none"
                 >
-                  {isActive && (
-                    <motion.div
-                      layoutId="desktopNavPill"
-                      className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl shadow-lg shadow-indigo-600/30"
-                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  <motion.div
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
+                    animate={{ y: isActive ? -2 : 0 }}
+                    className={`nav-circle-orb ${isActive ? 'nav-circle-active' : ''}`}
+                  >
+                    <Icon
+                      className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${
+                        isActive ? 'text-white scale-110' : `${item.color} group-hover:scale-110`
+                      }`}
                     />
-                  )}
-
-                  <span className="relative z-10 flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110 text-white' : `${item.activeColor} group-hover:scale-105`}`} />
-                    <span>{item.label}</span>
+                  </motion.div>
+                  <span
+                    className={`text-[10px] font-semibold tracking-tight transition-colors ${
+                      isActive ? 'text-cyan-300 font-bold' : 'text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  >
+                    {item.label}
                   </span>
-
-                  {isActive && (
-                    <span className="relative z-10 w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_6px_#67e8f9]" />
-                  )}
                 </button>
               );
             })}
-          </div>
+          </nav>
         </div>
+      </header>
 
-        {/* Footer Actions */}
-        <div className="pt-3 border-t border-white/10 space-y-2">
-          <button
-            onClick={() => {
-              SoundFX.click();
-              setActiveLayer('public');
-            }}
-            className="w-full py-2.5 px-3 rounded-xl glass-pill hover:bg-white/10 text-xs font-semibold flex items-center justify-center gap-2 text-cyan-400 transition"
-          >
-            <Globe className="w-4 h-4" />
-            <span>Switch to Public Site</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* MOBILE STICKY GLASS TOP HEADER & MOVING ANIMATED DOCK (< md screens) */}
-      <div className="md:hidden sticky top-0 z-30 bg-slate-950/80 backdrop-blur-2xl border-b border-white/10 shadow-2xl">
-        {/* Mobile Header Bar */}
-        <div className="px-4 py-2.5 flex items-center justify-between border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center font-black text-xs shadow-md shadow-indigo-600/40">
-              OS
-            </div>
-            <div>
-              <span className="text-xs font-bold text-white tracking-tight">Mahim Life OS</span>
-              <span className="ml-1.5 text-[9px] font-mono text-emerald-400">● LIVE</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                SoundFX.click();
-                setShowSyncModal(true);
-              }}
-              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold flex items-center gap-1 active:scale-95 transition"
-            >
-              <Cloud className="w-3.5 h-3.5 animate-pulse" />
-              <span>Cloud</span>
-            </button>
-
-            <button
-              onClick={() => {
-                SoundFX.click();
-                setMobileIconOnly(!mobileIconOnly);
-              }}
-              title={mobileIconOnly ? 'Show Labels' : 'Icon Only Mode'}
-              className={`p-1.5 rounded-xl border transition ${
-                mobileIconOnly
-                  ? 'bg-indigo-600/40 border-indigo-400 text-indigo-200'
-                  : 'glass-pill text-slate-300'
-              }`}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              onClick={() => {
-                SoundFX.click();
-                setActiveLayer('public');
-              }}
-              className="p-1.5 rounded-xl glass-pill text-cyan-400 active:scale-95 transition"
-            >
-              <Globe className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* MOBILE MOVING ANIMATED HORIZONTAL DOCK */}
-        <div className="px-2 py-2 overflow-x-auto no-scrollbar flex items-center gap-1.5 scroll-smooth">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleTabChange(item.id)}
-                className={`relative shrink-0 flex items-center justify-center transition-all ${
-                  mobileIconOnly
-                    ? 'w-11 h-11 rounded-2xl'
-                    : 'px-3.5 py-2 rounded-2xl gap-2'
-                } ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200 glass-pill'
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="mobileNavPill"
-                    className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl shadow-lg shadow-indigo-600/40 border border-white/20"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-
-                <motion.div
-                  animate={{ scale: isActive ? 1.15 : 1 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-                  className="relative z-10"
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.activeColor}`} />
-                </motion.div>
-
-                {!mobileIconOnly && (
-                  <span className="relative z-10 text-xs font-bold tracking-tight whitespace-nowrap">
-                    {item.shortLabel}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN WORKSPACE CONTENT */}
       <main className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6 max-w-7xl mx-auto w-full relative z-10">
-        <SecretPWAWidget />
+        {importNotice && (
+          <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-bold text-center">
+            {importNotice}
+          </div>
+        )}
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -371,17 +254,6 @@ export default function Layer2Shell() {
                       Update your Layer-1 Live Status, manage Projects, and read Service Bookings.
                     </p>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      SoundFX.click();
-                      setShowSyncModal(true);
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg transition"
-                  >
-                    <Cloud className="w-4 h-4" />
-                    <span>Supabase Sync</span>
-                  </button>
                 </div>
 
                 <form onSubmit={handleSaveNow} className="glass-crystal rounded-3xl p-5 space-y-3">
@@ -449,10 +321,9 @@ export default function Layer2Shell() {
                       </button>
                     </form>
 
-                    {/* Manage Published Projects */}
                     <div className="glass-crystal rounded-3xl p-5 space-y-2.5">
                       <h3 className="font-bold text-xs uppercase text-slate-400">
-                        Manage Custom Projects ({data.projects.length})
+                        Manage Projects ({data.projects.length})
                       </h3>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {data.projects.map((p) => (
@@ -515,6 +386,76 @@ export default function Layer2Shell() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* SUBTLE BOTTOM CORNER DATA EXPORT, IMPORT, APK & PROTECTED RESET BAR */}
+      <footer className="relative z-10 border-t border-white/5 bg-slate-950/60 backdrop-blur-xl py-4 px-4 sm:px-6 mt-10">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500">
+          {/* Bottom-Left: Full Calendar & Backup Export/Import */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                SoundFX.laser();
+                downloadCalendarCSV(data);
+              }}
+              className="px-2.5 py-1.5 rounded-lg glass-pill hover:bg-white/10 text-emerald-400 flex items-center gap-1.5 transition"
+              title="Download all spending & meal calendar history as Excel/CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Export Calendar (.CSV)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                SoundFX.laser();
+                downloadFullOSBackupJSON(data);
+              }}
+              className="px-2.5 py-1.5 rounded-lg glass-pill hover:bg-white/10 text-cyan-400 flex items-center gap-1.5 transition"
+              title="Download full portable backup with calendar timeline (.JSON)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Backup Data (.JSON)</span>
+            </button>
+
+            <input
+              type="file"
+              accept=".json"
+              ref={fileInputRef}
+              onChange={handleImportFile}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2.5 py-1.5 rounded-lg glass-pill hover:bg-white/10 text-indigo-300 flex items-center gap-1.5 transition"
+              title="Restore previously downloaded JSON backup"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import Backup</span>
+            </button>
+
+            <a
+              href="/kmmahim-life-os.apk"
+              download="kmmahim-life-os.apk"
+              className="px-2.5 py-1.5 rounded-lg glass-pill hover:bg-white/10 text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+              title="Private Android APK"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>APK</span>
+            </a>
+          </div>
+
+          {/* Bottom-Right Corner: Protected Data Reset */}
+          <button
+            onClick={() => {
+              SoundFX.click();
+              setShowDeleteAllModal(true);
+            }}
+            className="text-[11px] text-slate-600 hover:text-rose-400 flex items-center gap-1 transition"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>Reset All OS Data</span>
+          </button>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -15,8 +15,6 @@ export default function CommandOverview({ onNavigate }) {
     updateDailyMeal,
     updateDailyHabits,
     addIdea,
-    resetAllPersonalOSData,
-    hasDemoData,
     syncStatus
   } = useOS();
 
@@ -29,9 +27,6 @@ export default function CommandOverview({ onNavigate }) {
 
   // Quick Idea Inline State
   const [quickIdea, setQuickIdea] = useState('');
-
-  // Confirm Wipe All Demo
-  const [confirmWipe, setConfirmWipe] = useState(false);
 
   // Finance stats
   const wallets = data.finance?.wallets || {};
@@ -104,21 +99,9 @@ export default function CommandOverview({ onNavigate }) {
     }));
   };
 
-  const handleWipeDemo = () => {
-    if (!confirmWipe) {
-      SoundFX.click();
-      setConfirmWipe(true);
-      setTimeout(() => setConfirmWipe(false), 4000);
-      return;
-    }
-    SoundFX.laser();
-    resetAllPersonalOSData();
-    setConfirmWipe(false);
-  };
-
   return (
     <div className="space-y-6">
-      {/* Top Hero Welcome & Fresh Start Banner */}
+      {/* Top Hero Welcome Banner */}
       <div className="glass-crystal rounded-3xl p-6 relative overflow-hidden">
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-wrap items-center justify-between gap-4 relative z-10">
@@ -135,27 +118,11 @@ export default function CommandOverview({ onNavigate }) {
             </p>
           </div>
 
-          {/* Demo Wipe / Start Real Data Button */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleWipeDemo}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition active:scale-95 shadow-lg ${
-                confirmWipe
-                  ? 'bg-rose-600 text-white animate-pulse'
-                  : hasDemoData
-                  ? 'bg-gradient-to-r from-amber-500 to-rose-600 text-white shadow-rose-900/30'
-                  : 'glass-pill text-rose-400 hover:bg-rose-500/20'
-              }`}
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>
-                {confirmWipe
-                  ? 'সত্যিই সব ডেমো মুছে ০ করবেন? (Click)'
-                  : hasDemoData
-                  ? '🧹 সব ডেমো মুছে আসল হিসাব (০৳) শুরু করুন'
-                  : 'Reset All Personal Data'}
-              </span>
-            </button>
+            <span className="px-3.5 py-2 rounded-2xl glass-pill text-xs font-mono text-emerald-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{syncStatus?.status === 'success' ? 'Cloud Synced' : 'Local Live Engine'}</span>
+            </span>
           </div>
         </div>
       </div>

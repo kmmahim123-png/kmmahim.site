@@ -111,17 +111,20 @@ const INITIAL_DATA = {
   },
   habits: {
     minoxidilBottleStart: "2026-11-01",
+    customHabits: [],
     dailyLogs: {
       "2026-11-09": {
         namaz: { fajr: true, zuhr: true, asr: true, maghrib: true, isha: false },
         minoxidil: { morning: true, night: false },
-        gym: { done: true, muscle: "Chest & Triceps", weightLog: "Dumbbell Press 22kg" }
+        gym: { done: true, muscle: "Chest & Triceps", weightLog: "Dumbbell Press 22kg" },
+        custom: {}
       }
     }
   },
+  goalCycleStamps: {},
   goals: [
-    { id: "g1", title: "Connect OpenClaw Webhook with Social Poster", timeframe: "daily", completed: false, category: "AI Work" },
-    { id: "g2", title: "Review Sports Science Lecture Notes", timeframe: "daily", completed: false, category: "Academic" }
+    { id: "g1", title: "Connect OpenClaw Webhook with Social Poster", timeframe: "daily", completed: false, category: "AI Work", deadline: "" },
+    { id: "g2", title: "Review Sports Science Lecture Notes", timeframe: "daily", completed: false, category: "Academic", deadline: "" }
   ],
   ideas: [
     {
@@ -161,20 +164,65 @@ const INITIAL_DATA = {
   }
 };
 
+// Helper: Local YYYY-MM-DD
+const getLocalDateStr = (d = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Helper: Current cycle keys for Daily (12 AM), Weekly (Friday Reset), Monthly (Month End), Yearly (Dec 31)
+export const getGoalCycleKeys = (now = new Date()) => {
+  const daily = getLocalDateStr(now);
+
+  // Weekly anchored to Friday (day 5): find upcoming or current Friday
+  const d = new Date(now);
+  const dayOfWeek = d.getDay(); // 0=Sun..5=Fri, 6=Sat
+  const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+  d.setDate(d.getDate() + daysUntilFriday);
+  const weekly = `fri-${getLocalDateStr(d)}`;
+
+  const monthly = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const yearly = `${now.getFullYear()}`;
+
+  return { daily, weekly, monthly, yearly };
+};
+
 export const OSProvider = ({ children }) => {
   const [data, setData] = useState(() => {
     const saved = localStorage.getItem('KM_MAHIM_LIFE_OS_V1');
-    if (!saved) return INITIAL_DATA;
+    const cycles = getGoalCycleKeys(new Date());
+    if (!saved) {
+      return { ...INITIAL_DATA, goalCycleStamps: cycles };
+    }
     try {
       const parsed = JSON.parse(saved);
+      const savedStamps = parsed.goalCycleStamps || {};
+      let goals = parsed.goals || INITIAL_DATA.goals;
+
+      // Auto-reset completed flags when a cycle (Daily midnight, Weekly Friday, Monthly end, Yearly end) rolls over
+      goals = goals.map((g) => {
+        const tf = g.timeframe || 'daily';
+        if (savedStamps[tf] && savedStamps[tf] !== cycles[tf] && g.completed) {
+          return { ...g, completed: false };
+        }
+        return g;
+      });
+
       return {
         ...INITIAL_DATA,
         ...parsed,
         profile: { ...INITIAL_DATA.profile, ...(parsed.profile || {}) },
         finance: { ...INITIAL_DATA.finance, ...(parsed.finance || {}) },
         meals: { ...INITIAL_DATA.meals, ...(parsed.meals || {}) },
-        habits: { ...INITIAL_DATA.habits, ...(parsed.habits || {}) },
-        goals: parsed.goals || INITIAL_DATA.goals,
+        habits: {
+          ...INITIAL_DATA.habits,
+          ...(parsed.habits || {}),
+          customHabits: parsed.habits?.customHabits || []
+        },
+        goalCycleStamps: cycles,
+        goals,
         ideas: parsed.ideas || INITIAL_DATA.ideas,
         socialQueue: parsed.socialQueue?.length ? parsed.socialQueue : INITIAL_DATA.socialQueue,
         agents: {
@@ -185,7 +233,7 @@ export const OSProvider = ({ children }) => {
         }
       };
     } catch {
-      return INITIAL_DATA;
+      return { ...INITIAL_DATA, goalCycleStamps: cycles };
     }
   });
 
@@ -584,7 +632,8 @@ export const OSProvider = ({ children }) => {
       const existingDay = prev.habits.dailyLogs[dateKey] || {
         namaz: { fajr: false, zuhr: false, asr: false, maghrib: false, isha: false },
         minoxidil: { morning: false, night: false },
-        gym: { done: false, muscle: '', weightLog: '' }
+        gym: { done: false, muscle: '', weightLog: '' },
+        custom: {}
       };
       const updatedDay = typeof habitUpdater === 'function' ? habitUpdater(existingDay) : { ...existingDay, ...habitUpdater };
       return {
@@ -594,16 +643,71 @@ export const OSProvider = ({ children }) => {
     });
   };
 
+  const addCustomHabit = ({ label, emoji = '⚡' }) => {
+    if (!label) return;
+    setData(prev => ({
+      ...prev,
+      habits: {
+        ...prev.habits,
+        customHabits: [
+          ...(prev.habits.customHabits || []),
+          { id: 'ch_' + Date.now(), label, emoji }
+        ]
+      }
+    }));
+  };
+
+  const deleteCustomHabit = (habitId) => {
+    setData(prev => ({
+      ...prev,
+      habits: {
+        ...prev.habits,
+        customHabits: (prev.habits.customHabits || []).filter(h => h.id !== habitId)
+      }
+    }));
+  };
+
+  const toggleCustomHabitForDay = (dateKey, habitId) => {
+    updateDailyHabits(dateKey, (prevDay) => ({
+      ...prevDay,
+      custom: {
+        ...(prevDay.custom || {}),
+        [habitId]: !(prevDay.custom?.[habitId])
+      }
+    }));
+  };
+
   const updateMinoxidilStart = (startDate) => {
     setData(prev => ({ ...prev, habits: { ...prev.habits, minoxidilBottleStart: startDate } }));
   };
 
-  const addGoal = ({ title, timeframe, category }) => {
+  const addGoal = ({ title, timeframe, category, deadline }) => {
     if (!title) return;
     setData(prev => ({
       ...prev,
-      goals: [{ id: 'goal_' + Date.now(), title, timeframe: timeframe || 'daily', completed: false, category: category || 'General' }, ...prev.goals]
+      goals: [
+        {
+          id: 'goal_' + Date.now(),
+          title,
+          timeframe: timeframe || 'daily',
+          completed: false,
+          category: category || 'General',
+          deadline: deadline || '',
+          createdAt: new Date().toISOString()
+        },
+        ...prev.goals
+      ]
     }));
+  };
+
+  const restoreFromJSONBackup = (parsedPayload) => {
+    const incoming = parsedPayload?.rawState || parsedPayload;
+    if (!incoming || typeof incoming !== 'object') return false;
+    setData((prev) => ({
+      ...prev,
+      ...incoming
+    }));
+    return true;
   };
 
   const toggleGoalComplete = (goalId) => {
@@ -735,10 +839,14 @@ export const OSProvider = ({ children }) => {
         resetAllPersonalOSData,
         hasDemoData,
         updateDailyHabits,
+        addCustomHabit,
+        deleteCustomHabit,
+        toggleCustomHabitForDay,
         updateMinoxidilStart,
         addGoal,
         toggleGoalComplete,
         deleteGoal,
+        restoreFromJSONBackup,
         addIdea,
         deleteIdea,
         addSocialPost,

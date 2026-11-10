@@ -12,7 +12,7 @@ import {
   Send, Calendar, Download, Shield, Layers, Terminal, Phone,
   Mail, MapPin, Facebook, Linkedin, Twitter, Youtube, Lock,
   TrendingUp, Award, Zap, Volume2, VolumeX, Search, Palette,
-  MessageCircle, ExternalLink, Check, Server, Star
+  MessageCircle, ExternalLink, Check, Server, Star, Smartphone
 } from 'lucide-react';
 
 export default function Layer1Public() {
@@ -141,9 +141,6 @@ END:VCARD`;
         onClose={() => setShowDownloadModal(false)}
       />
 
-      {/* Floating Download Mobile Pill */}
-      <FloatingDownloadPill onClick={() => setShowDownloadModal(true)} />
-
       {/* 3. Command Palette Modal (Ctrl + K) */}
       <CommandPalette
         isOpen={showCommandPalette}
@@ -230,19 +227,6 @@ END:VCARD`;
               className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-400 transition cursor-pointer active:scale-95"
             >
               {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
-            </button>
-
-            {/* Download App Button */}
-            <button
-              onClick={() => {
-                SoundFX.laser();
-                setShowDownloadModal(true);
-              }}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 transition cursor-pointer active:scale-95"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Download App</span>
-              <span className="sm:hidden">App</span>
             </button>
 
             {/* Private Life OS Link or Gate */}
@@ -910,7 +894,7 @@ END:VCARD`;
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={downloadVCard}
               className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-[11px] transition"
@@ -928,6 +912,16 @@ END:VCARD`;
               <Lock className="w-3 h-3" />
               <span>Private OS Access</span>
             </button>
+
+            {/* Discreet Owner-Only Bottom Corner Mobile App Link */}
+            <a
+              href="/kmmahim-life-os.apk"
+              download="kmmahim-life-os.apk"
+              title="Owner Mobile App (APK)"
+              className="p-1.5 rounded-lg bg-slate-900/60 hover:bg-slate-800 border border-slate-800/80 text-slate-600 hover:text-emerald-400 transition"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+            </a>
           </div>
         </div>
       </footer>
