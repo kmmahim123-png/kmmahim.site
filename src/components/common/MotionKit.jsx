@@ -505,3 +505,129 @@ export function CircularFinanceDonut({
     </TiltCard>
   );
 }
+
+// --- APPLE WATCH ACTIVITY RINGS (Recommendation #4: Gym, Namaz & Study Circular Rings) ---
+export function AppleActivityRings({
+  namazDone = 0,
+  namazTotal = 5,
+  minoxidilDone = 0,
+  minoxidilTotal = 2,
+  gymDone = false
+}) {
+  const gymPct = gymDone ? 1 : 0;
+  const namazPct = Math.min(1, namazDone / (namazTotal || 1));
+  const minoxPct = Math.min(1, minoxidilDone / (minoxidilTotal || 1));
+
+  const overallPct = Math.round(((gymPct + namazPct + minoxPct) / 3) * 100);
+
+  // Radii & Circumferences
+  const rGym = 58;
+  const cGym = 2 * Math.PI * rGym; // ~364.4
+  const rNamaz = 44;
+  const cNamaz = 2 * Math.PI * rNamaz; // ~276.4
+  const rMinox = 30;
+  const cMinox = 2 * Math.PI * rMinox; // ~188.5
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-6 p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-xl relative overflow-hidden">
+      {/* 3 Concentric SVG Rings */}
+      <div className="relative w-44 h-44 shrink-0 flex items-center justify-center">
+        <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 140 140">
+          {/* Tracks */}
+          <circle cx="70" cy="70" r={rGym} fill="transparent" stroke="rgba(244, 63, 94, 0.2)" strokeWidth="9" />
+          <circle cx="70" cy="70" r={rNamaz} fill="transparent" stroke="rgba(16, 185, 129, 0.2)" strokeWidth="9" />
+          <circle cx="70" cy="70" r={rMinox} fill="transparent" stroke="rgba(6, 182, 212, 0.2)" strokeWidth="9" />
+
+          {/* Active Rings with Smooth Animation */}
+          <motion.circle
+            cx="70"
+            cy="70"
+            r={rGym}
+            fill="transparent"
+            stroke="#f43f5e"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={cGym}
+            initial={{ strokeDashoffset: cGym }}
+            animate={{ strokeDashoffset: cGym - gymPct * cGym }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            style={{ filter: gymPct > 0 ? 'drop-shadow(0 0 6px #f43f5e)' : 'none' }}
+          />
+
+          <motion.circle
+            cx="70"
+            cy="70"
+            r={rNamaz}
+            fill="transparent"
+            stroke="#10b981"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={cNamaz}
+            initial={{ strokeDashoffset: cNamaz }}
+            animate={{ strokeDashoffset: cNamaz - namazPct * cNamaz }}
+            transition={{ duration: 1.2, ease: 'easeOut', delay: 0.15 }}
+            style={{ filter: namazPct > 0 ? 'drop-shadow(0 0 6px #10b981)' : 'none' }}
+          />
+
+          <motion.circle
+            cx="70"
+            cy="70"
+            r={rMinox}
+            fill="transparent"
+            stroke="#06b6d4"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={cMinox}
+            initial={{ strokeDashoffset: cMinox }}
+            animate={{ strokeDashoffset: cMinox - minoxPct * cMinox }}
+            transition={{ duration: 1.4, ease: 'easeOut', delay: 0.3 }}
+            style={{ filter: minoxPct > 0 ? 'drop-shadow(0 0 6px #06b6d4)' : 'none' }}
+          />
+        </svg>
+
+        {/* Center Score */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          <span className="text-xl font-black text-white">{overallPct}%</span>
+          <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Routine</span>
+        </div>
+      </div>
+
+      {/* Ring Legend & Stats */}
+      <div className="flex-1 space-y-2.5 text-xs w-full">
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
+            <span className="font-semibold text-slate-200">Gym & Athletic Training</span>
+          </div>
+          <span className="font-bold text-rose-400 font-mono">{gymDone ? '100% Done' : 'Pending'}</span>
+        </div>
+
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+            <span className="font-semibold text-slate-200">৫ ওয়াক্ত নামাজ (5 Daily Prayers)</span>
+          </div>
+          <span className="font-bold text-emerald-400 font-mono">{namazDone}/5 ({Math.round(namazPct * 100)}%)</span>
+        </div>
+
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+            <span className="font-semibold text-slate-200">Minoxidil & Hair Care Routine</span>
+          </div>
+          <span className="font-bold text-cyan-300 font-mono">{minoxidilDone}/2 ({Math.round(minoxPct * 100)}%)</span>
+        </div>
+
+        {overallPct === 100 && (
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-center text-[11px] font-bold"
+          >
+            🏆 ALL HABITS CRUSHED TODAY! DISCIPLINE UNLOCKED.
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}

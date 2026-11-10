@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useOS } from '../context/OSContext';
+import { AppleActivityRings } from './common/MotionKit';
 import { CheckSquare, Flame, Dumbbell, Sparkles, Droplets, Calendar, CheckCircle2 } from 'lucide-react';
 
 export default function HabitsTracker() {
@@ -85,6 +86,15 @@ export default function HabitsTracker() {
           />
         </div>
       </div>
+
+      {/* Apple Watch Activity Rings (Recommendation #4) */}
+      <AppleActivityRings
+        namazDone={namazDoneCount}
+        namazTotal={5}
+        minoxidilDone={currentDay.minoxidil ? Object.values(currentDay.minoxidil).filter(Boolean).length : 0}
+        minoxidilTotal={2}
+        gymDone={Boolean(currentDay.gym?.done)}
+      />
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* 1. Namaz Tracker */}
