@@ -1,9 +1,0 @@
-{
-	"appId": "com.kmmahim.os",
-	"appName": "KM Mahim OS",
-	"webDir": "dist",
-	"bundledWebRuntime": false,
-	"server": {
-		"androidScheme": "https"
-	}
-}
