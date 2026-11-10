@@ -1,17 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../../context/OSContext';
 import {
   Cloud, CloudUpload, CloudDownload, Database, CheckCircle2,
-  AlertCircle, RefreshCw, X, Copy, Check, Server, ShieldCheck
+  AlertCircle, RefreshCw, X, Copy, Check, Server, GitMerge
 } from 'lucide-react';
 import { SoundFX } from './SoundEffects';
+
+function summarizeOSState(osData) {
+  if (!osData) return null;
+  const wallets = osData.finance?.wallets || {};
+  const balance = Object.values(wallets).reduce((sum, v) => sum + Number(v || 0), 0);
+  return {
+    balance,
+    transactions: osData.finance?.transactions?.length || 0,
+    meals: osData.meals?.logs ? Object.keys(osData.meals.logs).length : 0,
+    habits: osData.habits?.dailyLogs ? Object.keys(osData.habits.dailyLogs).length : 0,
+    goals: osData.goals?.length || 0,
+    ideas: osData.ideas?.length || 0
+  };
+}
 
 export default function SupabaseSyncModal({ isOpen, onClose }) {
   const {
     data,
     uploadToSupabase,
     pullFromSupabase,
+    mergeAndSyncWithCloud,
+    refreshCloudStatus,
+    cloudSnapshot,
     syncStatus,
     autoSync,
     toggleAutoSync
@@ -19,6 +36,13 @@ export default function SupabaseSyncModal({ isOpen, onClose }) {
 
   const [copiedSql, setCopiedSql] = useState(false);
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'sql'
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && refreshCloudStatus) {
+      refreshCloudStatus();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -59,16 +83,24 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
     await pullFromSupabase();
   };
 
-  const recordsCount = {
-    transactions: data.finance?.transactions?.length || 0,
-    wallets: Object.keys(data.finance?.wallets || {}).length,
-    meals: data.meals?.logs ? Object.keys(data.meals.logs).length : 0,
-    habits: data.habits?.dailyLogs ? Object.keys(data.habits.dailyLogs).length : 0,
-    goals: data.goals?.length || 0,
-    ideas: data.ideas?.length || 0,
-    projects: data.projects?.length || 0,
-    socialQueue: data.socialQueue?.length || 0
+  const handleMerge = async () => {
+    SoundFX.laser();
+    await mergeAndSyncWithCloud();
   };
+
+  const handleVerifyAndSync = async () => {
+    SoundFX.laser();
+    setVerifying(true);
+    const diag = await refreshCloudStatus();
+    if (diag?.success) {
+      await mergeAndSyncWithCloud();
+      setActiveTab('sync');
+    }
+    setVerifying(false);
+  };
+
+  const localSummary = summarizeOSState(data);
+  const cloudSummary = summarizeOSState(cloudSnapshot?.data);
 
   return (
     <AnimatePresence>
@@ -84,7 +116,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
           <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                <Cloud className="w-5 h-5 animate-pulse" />
+                <Cloud className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -94,7 +126,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
                   </span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Cloud backup, data sync & PostgreSQL table manager
+                  Real-time Laptop & Mobile Database Bridge
                 </p>
               </div>
             </div>
@@ -124,7 +156,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
               }`}
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Data Sync & Backup</span>
+              <span>Data Sync & Merge</span>
             </button>
             <button
               onClick={() => {
@@ -143,10 +175,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
           </div>
 
           {/* Body */}
-          <div className="p-6 overflow-y-auto space-y-6 text-xs">
+          <div className="p-6 overflow-y-auto space-y-5 text-xs">
             {activeTab === 'sync' && (
               <>
-                {/* Sync Status Banner */}
+                {/* Live Sync Status Banner */}
                 <div
                   className={`p-4 rounded-2xl border flex flex-col gap-3 ${
                     syncStatus.status === 'success'
@@ -178,7 +210,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
                             : syncStatus.status === 'success'
                             ? 'Cloud Live Synced! (Laptop ⇄ Mobile)'
                             : syncStatus.status === 'needs_setup'
-                            ? '⚠️ টেবিল তৈরি করা বাকি আছে!'
+                            ? '⚠️ Supabase টেবিল সেটআপ বাকি!'
                             : syncStatus.status === 'error'
                             ? 'Sync Error'
                             : 'Supabase Ready'}
@@ -209,37 +241,47 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
                 </div>
 
                 {/* Main Action Buttons */}
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {/* Upload to Supabase */}
+                <div className="grid sm:grid-cols-2 gap-3">
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleUpload}
                     disabled={syncStatus.status === 'syncing'}
-                    className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold flex flex-col items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 disabled:opacity-50"
+                    className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/40 disabled:opacity-50"
                   >
-                    <CloudUpload className="w-6 h-6 animate-bounce" />
-                    <span className="text-sm">Upload Data to Supabase</span>
+                    <CloudUpload className="w-5 h-5" />
+                    <span className="text-xs sm:text-sm">Upload This Device → Cloud</span>
                     <span className="text-[10px] opacity-80 font-normal">
-                      Push local meals, finance & habits to cloud
+                      Push this device&apos;s data as primary cloud copy
                     </span>
                   </motion.button>
 
-                  {/* Pull from Supabase */}
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handlePull}
                     disabled={syncStatus.status === 'syncing'}
-                    className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold flex flex-col items-center justify-center gap-2 transition disabled:opacity-50"
+                    className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold flex flex-col items-center justify-center gap-1.5 transition disabled:opacity-50"
                   >
-                    <CloudDownload className="w-6 h-6 text-indigo-400" />
-                    <span className="text-sm">Restore from Supabase</span>
+                    <CloudDownload className="w-5 h-5 text-indigo-400" />
+                    <span className="text-xs sm:text-sm">Pull Cloud → This Device</span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      Pull latest cloud backup into this device
+                      Overwrite this device with latest cloud copy
                     </span>
                   </motion.button>
                 </div>
+
+                {/* Smart Merge Action */}
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={handleMerge}
+                  disabled={syncStatus.status === 'syncing'}
+                  className="w-full p-3.5 rounded-2xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/35 text-indigo-200 font-bold flex items-center justify-center gap-2.5 transition disabled:opacity-50"
+                >
+                  <GitMerge className="w-4 h-4 text-indigo-400" />
+                  <span>Smart Merge (মোবাইল + ওয়েবসাইটের উভয় ডেটা একত্র করুন)</span>
+                </motion.button>
 
                 {/* Auto Sync Toggle */}
                 <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
@@ -248,7 +290,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
                       Auto-Sync on Changes
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      Automatically push updates to Supabase when you log meals, expenses, or habits.
+                      Automatically sync meals, finance, habits & goals across Laptop & Mobile.
                     </span>
                   </div>
                   <button
@@ -268,36 +310,65 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
                   </button>
                 </div>
 
-                {/* Data Records Summary */}
-                <div className="space-y-2">
-                  <span className="font-semibold text-slate-300 block uppercase tracking-wider text-[10px]">
-                    Current OS Data Package
-                  </span>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                      <div className="text-lg font-black text-emerald-400 font-mono">
-                        {recordsCount.wallets}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Wallets</div>
+                {/* Local vs Cloud Comparison */}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                      This Device (Local)
                     </div>
-                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                      <div className="text-lg font-black text-rose-400 font-mono">
-                        {recordsCount.transactions}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Expenses</div>
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Wallet Total:</span>
+                      <span className="font-mono font-bold text-white">৳{localSummary.balance}</span>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                      <div className="text-lg font-black text-indigo-400 font-mono">
-                        {recordsCount.goals}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Goals</div>
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Transactions / Meals:</span>
+                      <span className="font-mono text-white">
+                        {localSummary.transactions} tx · {localSummary.meals} days
+                      </span>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                      <div className="text-lg font-black text-amber-400 font-mono">
-                        {recordsCount.ideas}
-                      </div>
-                      <div className="text-[10px] text-slate-400">Ideas</div>
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Goals / Ideas:</span>
+                      <span className="font-mono text-white">
+                        {localSummary.goals} goals · {localSummary.ideas} ideas
+                      </span>
                     </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center justify-between">
+                      <span>Supabase Cloud</span>
+                      {cloudSnapshot?.timestamp && (
+                        <span className="text-[9px] font-mono text-slate-400">
+                          {new Date(cloudSnapshot.timestamp).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
+                    {cloudSummary ? (
+                      <>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-400">Wallet Total:</span>
+                          <span className="font-mono font-bold text-emerald-300">৳{cloudSummary.balance}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-400">Transactions / Meals:</span>
+                          <span className="font-mono text-emerald-200">
+                            {cloudSummary.transactions} tx · {cloudSummary.meals} days
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-slate-400">Goals / Ideas:</span>
+                          <span className="font-mono text-emerald-200">
+                            {cloudSummary.goals} goals · {cloudSummary.ideas} ideas
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-slate-500 py-2">
+                        {syncStatus.status === 'needs_setup'
+                          ? 'টেবিল তৈরি না হওয়ায় এখনো ক্লাউডে কোনো রেকর্ড নেই।'
+                          : 'ক্লাউড টেবিল এখনো খালি (প্রথম Upload দিন)।'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
@@ -305,17 +376,17 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
 
             {activeTab === 'sql' && (
               <div className="space-y-4">
-                <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-xs">
-                  Copy and paste this SQL into your{' '}
+                <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-xs leading-relaxed">
+                  ১. নিচের SQL কপি করুন → ২.{' '}
                   <a
-                    href="https://supabase.com/dashboard/project/uqupazmycylfcqvsajnx/sql"
+                    href="https://supabase.com/dashboard/project/uqupazmycylfcqvsajnx/sql/new"
                     target="_blank"
                     rel="noreferrer"
-                    className="underline text-indigo-300 font-bold"
+                    className="underline text-amber-300 font-bold"
                   >
-                    Supabase SQL Editor
+                    Supabase SQL Editor খুলুন
                   </a>{' '}
-                  to create the tables for full cloud persistence.
+                  → ৩. পেস্ট করে <b>Run</b> চাপুন → ৪. নিচের Verify বাটনে ক্লিক করুন।
                 </div>
 
                 <div className="relative">
@@ -339,6 +410,17 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
                     )}
                   </button>
                 </div>
+
+                <button
+                  onClick={handleVerifyAndSync}
+                  disabled={verifying}
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-4 h-4 ${verifying ? 'animate-spin' : ''}`} />
+                  <span>
+                    {verifying ? 'যাচাই ও সিঙ্ক হচ্ছে...' : 'আমি SQL রান করেছি — এখনই চেক ও সিঙ্ক করুন'}
+                  </span>
+                </button>
               </div>
             )}
           </div>

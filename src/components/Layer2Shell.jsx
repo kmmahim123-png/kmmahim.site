@@ -16,7 +16,7 @@ import AgentHub from './AgentHub';
 import {
   Wallet, Utensils, CheckSquare, Lightbulb,
   Share2, Bot, MessageSquare, Globe, Plus, Target,
-  Cloud, LayoutDashboard, Trash2, Download, Upload, FileSpreadsheet, Smartphone
+  Cloud, LayoutDashboard, Trash2, Download, Upload, FileSpreadsheet, Smartphone, AlertTriangle
 } from 'lucide-react';
 
 export default function Layer2Shell() {
@@ -233,6 +233,33 @@ export default function Layer2Shell() {
 
       {/* MAIN WORKSPACE CONTENT */}
       <main className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6 max-w-7xl mx-auto w-full relative z-10">
+        {(syncStatus.status === 'needs_setup' || syncStatus.status === 'error') && (
+          <button
+            onClick={() => {
+              SoundFX.click();
+              setShowSyncModal(true);
+            }}
+            className="w-full text-left p-3.5 sm:p-4 rounded-2xl bg-amber-500/15 hover:bg-amber-500/20 border border-amber-500/40 text-amber-200 flex flex-wrap items-center justify-between gap-3 transition"
+          >
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
+              <div>
+                <div className="text-xs sm:text-sm font-bold text-amber-300">
+                  {syncStatus.status === 'needs_setup'
+                    ? 'ক্লাউড সিঙ্ক এখনো চালু হয়নি (Supabase টেবিল তৈরি বাকি)'
+                    : 'Supabase ক্লাউড সিঙ্ক এরর'}
+                </div>
+                <div className="text-[11px] text-amber-100/80">
+                  {syncStatus.message || 'মোবাইল ও ল্যাপটপের ডেটা সিঙ্ক করতে এখানে ক্লিক করে ১-বারের SQL সেটআপ সম্পূর্ণ করুন।'}
+                </div>
+              </div>
+            </div>
+            <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-[11px] shrink-0">
+              সেটআপ ও সিঙ্ক দেখুন →
+            </span>
+          </button>
+        )}
+
         {importNotice && (
           <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-bold text-center">
             {importNotice}

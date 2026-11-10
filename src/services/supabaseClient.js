@@ -15,34 +15,84 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-function isMissingTableError(error) {
-  if (!error) return false;
-  return (
+function classifySupabaseError(error) {
+  if (!error) return { needsSetup: false, setupReason: null, message: '' };
+  const msg = String(error.message || '');
+  const lower = msg.toLowerCase();
+
+  if (
     error.code === 'PGRST205' ||
     error.code === '42P01' ||
-    (error.message && error.message.includes('Could not find the table'))
-  );
+    lower.includes('could not find the table') ||
+    lower.includes('does not exist')
+  ) {
+    return {
+      needsSetup: true,
+      setupReason: 'missing_table',
+      message: "Supabase connected, কিন্তু 'mahim_life_os' টেবিল এখনো তৈরি করা হয়নি।"
+    };
+  }
+
+  if (error.code === '42501' || lower.includes('row-level security')) {
+    return {
+      needsSetup: true,
+      setupReason: 'rls_blocked',
+      message: "টেবিল তৈরি হয়েছে, কিন্তু RLS Policy চালু নেই — SQL-এর POLICY অংশটি রান করুন।"
+    };
+  }
+
+  return {
+    needsSetup: false,
+    setupReason: null,
+    message: msg || 'Unknown Supabase error'
+  };
 }
 
 /**
- * Test real connectivity & table existence in Supabase
+ * Test real connectivity, table existence & read cloud row summary
  */
-export async function testSupabaseConnection() {
+export async function testSupabaseConnection(slotId = 'primary_os') {
   try {
-    const { error } = await supabase.from('mahim_life_os').select('slot').limit(1);
+    const { data, error } = await supabase
+      .from('mahim_life_os')
+      .select('data, updated_at')
+      .eq('slot', slotId)
+      .maybeSingle();
+
     if (error) {
-      if (isMissingTableError(error)) {
-        return {
-          success: false,
-          needsSetup: true,
-          message: "Supabase connected, কিন্তু 'mahim_life_os' টেবিল এখনো তৈরি করা হয়নি!"
-        };
-      }
-      return { success: false, message: error.message };
+      const classified = classifySupabaseError(error);
+      return {
+        success: false,
+        needsSetup: classified.needsSetup,
+        setupReason: classified.setupReason,
+        empty: false,
+        cloudData: null,
+        timestamp: null,
+        message: classified.message
+      };
     }
-    return { success: true, needsSetup: false, message: 'Supabase Database Live & Connected 🟢' };
+
+    return {
+      success: true,
+      needsSetup: false,
+      setupReason: null,
+      empty: !data,
+      cloudData: data?.data || null,
+      timestamp: data?.updated_at || null,
+      message: data
+        ? 'Supabase Database Live & Connected 🟢'
+        : 'Supabase Live Connected (Cloud টেবিল এখনো খালি — Upload করুন)'
+    };
   } catch (err) {
-    return { success: false, message: err.message || 'Network unreachable' };
+    return {
+      success: false,
+      needsSetup: false,
+      setupReason: null,
+      empty: false,
+      cloudData: null,
+      timestamp: null,
+      message: err.message || 'Network unreachable'
+    };
   }
 }
 
@@ -62,28 +112,28 @@ export async function uploadLifeOSData(slotId = 'primary_os', osData) {
     const { data, error } = await supabase
       .from('mahim_life_os')
       .upsert(payload, { onConflict: 'slot' })
-      .select();
+      .select('slot, updated_at');
 
     if (error) {
-      if (isMissingTableError(error)) {
-        return {
-          success: false,
-          needsSetup: true,
-          message: "ডাটাবেস টেবিল 'mahim_life_os' নেই — নিচের ১-ক্লিক SQL রান করে টেবিল তৈরি করুন।"
-        };
-      }
-      return { success: false, message: error.message };
+      const classified = classifySupabaseError(error);
+      return {
+        success: false,
+        needsSetup: classified.needsSetup,
+        setupReason: classified.setupReason,
+        message: classified.message
+      };
     }
 
     return {
       success: true,
       needsSetup: false,
+      setupReason: null,
       data,
       message: 'ডেটা সফলভাবে Supabase ডাটাবেসে সেভ হয়েছে! ☁️',
-      timestamp: updatedAt
+      timestamp: data?.[0]?.updated_at || updatedAt
     };
   } catch (err) {
-    return { success: false, message: err.message };
+    return { success: false, needsSetup: false, setupReason: null, message: err.message };
   }
 }
 
@@ -99,28 +149,34 @@ export async function fetchLifeOSData(slotId = 'primary_os') {
       .maybeSingle();
 
     if (error) {
-      if (isMissingTableError(error)) {
-        return {
-          success: false,
-          needsSetup: true,
-          message: "ডাটাবেস টেবিল 'mahim_life_os' এখনো তৈরি করা হয়নি।"
-        };
-      }
-      return { success: false, message: error.message };
+      const classified = classifySupabaseError(error);
+      return {
+        success: false,
+        needsSetup: classified.needsSetup,
+        setupReason: classified.setupReason,
+        message: classified.message
+      };
     }
 
     if (!data) {
-      return { success: true, empty: true, data: null, message: 'No cloud record uploaded yet.' };
+      return {
+        success: true,
+        needsSetup: false,
+        empty: true,
+        data: null,
+        message: 'No cloud record uploaded yet.'
+      };
     }
 
     return {
       success: true,
       needsSetup: false,
+      empty: false,
       data: data.data,
       timestamp: data.updated_at
     };
   } catch (err) {
-    return { success: false, message: err.message };
+    return { success: false, needsSetup: false, setupReason: null, message: err.message };
   }
 }
 
