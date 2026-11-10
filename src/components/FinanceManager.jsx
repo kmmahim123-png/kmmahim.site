@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useOS } from '../context/OSContext';
+import { AnimatedCounter, TiltCard } from './common/MotionKit';
 import {
   Wallet, ArrowUpRight, ArrowDownRight, PlusCircle, CheckCircle2,
   Clock, Filter, PieChart, Landmark, Smartphone, Banknote, Users
@@ -139,44 +140,49 @@ export default function FinanceManager() {
 
       {/* Total Net Worth & Multi-Wallets */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 flex flex-col justify-between">
+        <TiltCard maxTilt={8} className="bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/40 rounded-2xl p-5 shadow-xl shadow-indigo-950/30 flex flex-col justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
             Total Net Balance
           </span>
           <div className="my-2">
-            <span className="text-3xl font-black text-white">৳{totalBalance.toLocaleString()}</span>
+            <span className="text-3xl font-black text-white">
+              ৳<AnimatedCounter value={totalBalance} />
+            </span>
           </div>
           <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-800/80">
             <span className="text-emerald-400 flex items-center gap-0.5">
-              <ArrowUpRight className="w-3 h-3"/> In: ৳{totalIn.toLocaleString()}
+              <ArrowUpRight className="w-3 h-3"/> In: ৳<AnimatedCounter value={totalIn} />
             </span>
             <span className="text-rose-400 flex items-center gap-0.5">
-              <ArrowDownRight className="w-3 h-3"/> Out: ৳{totalOut.toLocaleString()}
+              <ArrowDownRight className="w-3 h-3"/> Out: ৳<AnimatedCounter value={totalOut} />
             </span>
           </div>
-        </div>
+        </TiltCard>
 
         {walletMeta.map((w) => {
           const Icon = w.icon;
           const bal = wallets[w.key] || 0;
           return (
-            <div
+            <TiltCard
               key={w.key}
-              className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between"
+              maxTilt={6}
+              className="bg-slate-900/70 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-lg flex flex-col justify-between"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-medium">{w.label}</span>
-                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${w.color} flex items-center justify-center text-white`}>
+                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${w.color} flex items-center justify-center text-white shadow-md`}>
                   <Icon className="w-4 h-4"/>
                 </div>
               </div>
               <div className="mt-3">
-                <span className="text-2xl font-bold text-white">৳{bal.toLocaleString()}</span>
+                <span className="text-2xl font-bold text-white">
+                  ৳<AnimatedCounter value={bal} />
+                </span>
                 <span className="block text-[10px] text-slate-500 mt-1 uppercase font-mono">
                   Active Wallet
                 </span>
               </div>
-            </div>
+            </TiltCard>
           );
         })}
       </div>

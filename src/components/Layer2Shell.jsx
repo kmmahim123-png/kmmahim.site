@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import { SecretPWAWidget } from './common/MotionKit';
 import FinanceManager from './FinanceManager';
 import MealManager from './MealManager';
 import HabitsTracker from './HabitsTracker';
@@ -110,108 +112,123 @@ export default function Layer2Shell() {
 
       {/* Main Content */}
       <main className="flex-1 p-6 overflow-y-auto space-y-6">
-        {activeTab === 'cms' && (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-              <div>
-                <h1 className="text-2xl font-bold">Public Website Controller & Client Inbox</h1>
-                <p className="text-xs text-slate-400">
-                  Update your Layer-1 Live Status, add new Projects, and view Service Bookings.
-                </p>
-              </div>
-            </div>
+        {/* Private PWA 1-Tap Install & 3x Speed Cache Engine (Visible ONLY in Layer 2 Private Panel) */}
+        <SecretPWAWidget />
 
-            <form onSubmit={handleSaveNow} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
-              <label className="text-xs font-semibold uppercase tracking-wider text-cyan-400 block">
-                Update Public "NOW" Status Bar
-              </label>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={nowInput}
-                  onChange={(e) => setNowInput(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm"
-                />
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold"
-                >
-                  Update Live
-                </button>
-              </div>
-            </form>
-
-            <div className="grid lg:grid-cols-2 gap-6">
-              <form onSubmit={handleAddProject} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
-                <h3 className="font-bold text-sm flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-emerald-400"/>
-                  <span>Add New Project to Public Portfolio</span>
-                </h3>
-                <input
-                  type="text"
-                  placeholder="Project or Brand Name"
-                  value={projTitle}
-                  onChange={(e) => setProjTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Category"
-                    value={projCategory}
-                    onChange={(e) => setProjCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Key Metric"
-                    value={projMetrics}
-                    onChange={(e) => setProjMetrics(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
-                  />
+        {/* Native Mobile Swipe / Slide Tab Transition Container */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.24, ease: [0.25, 0.1, 0.25, 1] }}
+            className="space-y-6"
+          >
+            {activeTab === 'cms' && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div>
+                    <h1 className="text-2xl font-bold">Public Website Controller & Client Inbox</h1>
+                    <p className="text-xs text-slate-400">
+                      Update your Layer-1 Live Status, add new Projects, and view Service Bookings.
+                    </p>
+                  </div>
                 </div>
-                <textarea
-                  rows="2"
-                  placeholder="Short description..."
-                  value={projDesc}
-                  onChange={(e) => setProjDesc(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
-                />
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold"
-                >
-                  Publish to Layer 1
-                </button>
-              </form>
 
-              <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
-                <h3 className="font-bold text-sm">Client Bookings & Agent Inbox ({data.messages.length})</h3>
-                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                  {data.messages.map((m) => (
-                    <div key={m.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-indigo-300">{m.sender}</span>
-                        <span className="text-[10px] text-slate-500">{m.date}</span>
-                      </div>
-                      <p className="text-cyan-400 font-medium">Service: {m.service}</p>
-                      <p className="text-slate-300">{m.text}</p>
-                      <p className="text-[10px] text-slate-400">Contact: {m.email}</p>
+                <form onSubmit={handleSaveNow} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-cyan-400 block">
+                    Update Public "NOW" Status Bar
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={nowInput}
+                      onChange={(e) => setNowInput(e.target.value)}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm"
+                    />
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold"
+                    >
+                      Update Live
+                    </button>
+                  </div>
+                </form>
+
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <form onSubmit={handleAddProject} className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <h3 className="font-bold text-sm flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-emerald-400"/>
+                      <span>Add New Project to Public Portfolio</span>
+                    </h3>
+                    <input
+                      type="text"
+                      placeholder="Project or Brand Name"
+                      value={projTitle}
+                      onChange={(e) => setProjTitle(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Category"
+                        value={projCategory}
+                        onChange={(e) => setProjCategory(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Key Metric"
+                        value={projMetrics}
+                        onChange={(e) => setProjMetrics(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
+                      />
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+                    <textarea
+                      rows="2"
+                      placeholder="Short description..."
+                      value={projDesc}
+                      onChange={(e) => setProjDesc(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold"
+                    >
+                      Publish to Layer 1
+                    </button>
+                  </form>
 
-        {activeTab === 'finance' && <FinanceManager/>}
-        {activeTab === 'meals' && <MealManager/>}
-        {activeTab === 'habits' && <HabitsTracker/>}
-        {activeTab === 'goals' && <GoalsTracker/>}
-        {activeTab === 'ideas' && <IdeaVault/>}
-        {activeTab === 'social' && <SocialPoster/>}
-        {activeTab === 'agents' && <AgentHub/>}
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 space-y-3">
+                    <h3 className="font-bold text-sm">Client Bookings & Agent Inbox ({data.messages.length})</h3>
+                    <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                      {data.messages.map((m) => (
+                        <div key={m.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-indigo-300">{m.sender}</span>
+                            <span className="text-[10px] text-slate-500">{m.date}</span>
+                          </div>
+                          <p className="text-cyan-400 font-medium">Service: {m.service}</p>
+                          <p className="text-slate-300">{m.text}</p>
+                          <p className="text-[10px] text-slate-400">Contact: {m.email}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'finance' && <FinanceManager/>}
+            {activeTab === 'meals' && <MealManager/>}
+            {activeTab === 'habits' && <HabitsTracker/>}
+            {activeTab === 'goals' && <GoalsTracker/>}
+            {activeTab === 'ideas' && <IdeaVault/>}
+            {activeTab === 'social' && <SocialPoster/>}
+            {activeTab === 'agents' && <AgentHub/>}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { useOS } from '../context/OSContext';
+import { TiltCard, AnimatedCounter } from './common/MotionKit';
 import {
   Sparkles, Code2, Cpu, Globe, ArrowUpRight, CheckCircle2,
   Send, Calendar, Download, Shield, Layers, Terminal, Phone,
-  Mail, MapPin, Facebook, Linkedin, Twitter, Youtube, Lock
+  Mail, MapPin, Facebook, Linkedin, Twitter, Youtube, Lock,
+  TrendingUp, Award, Zap
 } from 'lucide-react';
 
 export default function Layer1Public() {
@@ -134,14 +137,27 @@ END:VCARD`;
       {/* Hero Section */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-24 relative z-10">
         {/* Live "NOW" Bar */}
-        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200 mb-8">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-semibold text-indigo-400 uppercase tracking-wider">NOW:</span>
-          <span>{profile.nowStatus}</span>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-indigo-950/70 border border-indigo-500/40 text-xs text-indigo-200 mb-8 shadow-lg shadow-indigo-950/50 backdrop-blur-md"
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+          </span>
+          <span className="font-bold text-cyan-300 uppercase tracking-wider text-[11px]">NOW:</span>
+          <span className="font-medium text-slate-200">{profile.nowStatus}</span>
+        </motion.div>
 
         <div className="grid lg:grid-cols-12 gap-10 items-center">
-          <div className="lg:col-span-8 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="lg:col-span-8 space-y-6"
+          >
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1]">
               Building Brands,{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-cyan-300 to-emerald-400">
@@ -156,25 +172,29 @@ END:VCARD`;
             </p>
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <a
+              <motion.a
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 href="#services"
-                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition"
+                className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition cursor-pointer"
               >
                 <Sparkles className="w-4 h-4"/>
                 <span>Book a Service / Project</span>
-              </a>
-              <a
+              </motion.a>
+              <motion.a
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 href="#projects"
-                className="px-6 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-semibold text-sm flex items-center gap-2 transition"
+                className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-200 font-semibold text-sm flex items-center gap-2 transition cursor-pointer"
               >
                 <Layers className="w-4 h-4 text-cyan-400"/>
                 <span>Explore My Work</span>
-              </a>
+              </motion.a>
             </div>
-          </div>
+          </motion.div>
 
-          {/* Identity Quick Card */}
-          <div className="lg:col-span-4 bg-slate-900/70 backdrop-blur-xl border border-slate-800 p-6 rounded-2xl space-y-4">
+          {/* Identity Quick Card with 3D Tilt */}
+          <TiltCard className="lg:col-span-4 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 space-y-4 shadow-2xl shadow-indigo-950/40">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <p className="text-xs text-slate-400">Core Identity</p>
@@ -217,8 +237,64 @@ END:VCARD`;
                 </a>
               </div>
             </div>
-          </div>
+          </TiltCard>
         </div>
+
+        {/* Dynamic Metric Counter Strip (Ultra Motion) */}
+        <motion.div
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-md"
+        >
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <Award className="w-5 h-5"/>
+            </div>
+            <div>
+              <div className="text-2xl font-black text-white">
+                <AnimatedCounter value={3} />
+              </div>
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Scaled Ventures</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+              <Code2 className="w-5 h-5"/>
+            </div>
+            <div>
+              <div className="text-2xl font-black text-white">
+                <AnimatedCounter value={14} suffix="+" />
+              </div>
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Web & AI Systems</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Cpu className="w-5 h-5"/>
+            </div>
+            <div>
+              <div className="text-2xl font-black text-white">
+                <AnimatedCounter value={4} />
+              </div>
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">AI Agent Nodes</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <Zap className="w-5 h-5"/>
+            </div>
+            <div>
+              <div className="text-2xl font-black text-white">
+                <AnimatedCounter value={3} suffix="×" />
+              </div>
+              <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">PWA Offline Speed</p>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Projects & Ventures Showcase */}
         <section id="projects" className="mt-24">
@@ -227,41 +303,43 @@ END:VCARD`;
               <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">Portfolio & Ventures</p>
               <h2 className="text-2xl sm:text-3xl font-bold mt-1">What I’ve Built & Operated</h2>
             </div>
-            <p className="text-xs text-slate-400">Dynamically synced with Layer-2 Command OS</p>
+            <p className="text-xs text-slate-400">Dynamically synced with Layer-2 Command OS • 3D Tilt Enabled</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {projects.map((proj) => (
-              <div
+              <TiltCard
                 key={proj.id}
-                className="group bg-slate-900/60 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 transition flex flex-col justify-between"
+                className="bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 rounded-2xl shadow-xl shadow-slate-950/50"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                      {proj.category}
-                    </span>
-                    <span className="text-[11px] text-cyan-400 font-mono">{proj.badge}</span>
+                <div className="p-6 h-full flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                        {proj.category}
+                      </span>
+                      <span className="text-[11px] text-cyan-400 font-mono">{proj.badge}</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white group-hover:text-indigo-300 transition">
+                      {proj.title}
+                    </h3>
+                    <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+                      {proj.description}
+                    </p>
                   </div>
-                  <h3 className="text-xl font-bold text-white group-hover:text-indigo-300 transition">
-                    {proj.title}
-                  </h3>
-                  <p className="text-sm text-slate-400 mt-2 leading-relaxed">
-                    {proj.description}
-                  </p>
-                </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <span className="text-emerald-400 font-medium">{proj.metrics}</span>
-                  <a
-                    href={proj.link}
-                    className="inline-flex items-center gap-1 text-slate-300 hover:text-white font-semibold"
-                  >
-                    <span>Details</span>
-                    <ArrowUpRight className="w-3.5 h-3.5"/>
-                  </a>
+                  <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                    <span className="text-emerald-400 font-medium">{proj.metrics}</span>
+                    <a
+                      href={proj.link}
+                      className="inline-flex items-center gap-1 text-slate-300 hover:text-white font-semibold"
+                    >
+                      <span>Details</span>
+                      <ArrowUpRight className="w-3.5 h-3.5"/>
+                    </a>
+                  </div>
                 </div>
-              </div>
+              </TiltCard>
             ))}
           </div>
         </section>
