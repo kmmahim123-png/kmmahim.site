@@ -68,21 +68,21 @@ function SecretPinModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 relative">
+    <div className="fixed inset-0 z-50 bg-black/30 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-white border border-black/[0.08] shadow-[0_24px_60px_rgba(0,0,0,0.12)] rounded-[28px] max-w-sm w-full p-7 space-y-5 relative text-[#1d1d1f]">
         <button
           onClick={() => setShowPinModal(false)}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white"
+          className="absolute top-5 right-5 p-1.5 rounded-full text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition"
         >
-          <X className="w-4 h-4"/>
+          <X className="w-4 h-4" />
         </button>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-            <Lock className="w-5 h-5"/>
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-full bg-[#f5f5f7] border border-black/[0.06] flex items-center justify-center text-[#1d1d1f]">
+            <Lock className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="font-bold text-white">Layer-2 Security Gate</h3>
-            <p className="text-xs text-slate-400">Enter Personal OS PIN (Default: 2526)</p>
+            <h3 className="font-display font-semibold text-base text-[#1d1d1f]">Private Workspace</h3>
+            <p className="text-xs text-[#6e6e73]">Enter passcode to continue</p>
           </div>
         </div>
 
@@ -93,14 +93,14 @@ function SecretPinModal() {
             placeholder="••••"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            className="w-full text-center tracking-[0.6em] text-xl font-bold py-3 rounded-xl bg-slate-950 border border-slate-800 text-white"
+            className="w-full text-center tracking-[0.6em] text-xl font-semibold py-3.5 rounded-2xl bg-[#f5f5f7] border border-transparent focus:border-[#1d1d1f] focus:bg-white text-[#1d1d1f] outline-none transition-all"
           />
-          {error && <p className="text-xs text-red-400 text-center">Invalid PIN. Try 2526.</p>}
+          {error && <p className="text-xs text-[#ff3b30] text-center font-medium">Incorrect passcode.</p>}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white"
+            className="w-full py-3.5 rounded-full bg-[#1d1d1f] hover:bg-black font-medium text-sm text-white transition-all active:scale-[0.99]"
           >
-            Unlock Private Life OS
+            Unlock
           </button>
         </form>
       </div>

@@ -1,24 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Terminal, Globe, Wallet, Target, Lightbulb, Bot, Volume2, VolumeX, Download, X } from 'lucide-react';
-import { SoundFX } from './SoundEffects';
+import { Search, Terminal, Globe, Target, Smartphone, Mail } from 'lucide-react';
 
 export default function CommandPalette({
   isOpen,
   onClose,
   onOpenLifeOS,
-  onOpenDownload,
-  onToggleSound,
-  soundOn
+  onOpenDownload
 }) {
   const [query, setQuery] = useState('');
 
   const commands = [
-    { id: 'life-os', label: 'Unlock / Open Private Life OS', icon: Terminal, action: onOpenLifeOS, badge: 'PIN: 2526' },
-    { id: 'download', label: 'Download Android APK & Install PWA', icon: Download, action: onOpenDownload, badge: 'APK 4.6MB' },
-    { id: 'sound', label: soundOn ? 'Mute Sci-Fi Audio FX' : 'Enable Sci-Fi Audio FX', icon: soundOn ? Volume2 : VolumeX, action: onToggleSound, badge: soundOn ? 'ON' : 'OFF' },
-    { id: 'projects', label: 'Explore Projects & Brands (JACKFRU)', icon: Globe, action: () => { window.location.hash = '#projects'; onClose(); } },
-    { id: 'services', label: 'Book a Project / Service Package', icon: Target, action: () => { window.location.hash = '#services'; onClose(); } },
+    { id: 'work', label: 'Selected Work & Ventures (JACKFRU)', icon: Globe, action: () => { window.location.hash = '#work'; } },
+    { id: 'capabilities', label: 'Capabilities & Engagement Tiers', icon: Target, action: () => { window.location.hash = '#capabilities'; } },
+    { id: 'contact', label: 'Initiate Consultation / Inquiry', icon: Mail, action: () => { window.location.hash = '#contact'; } },
+    { id: 'life-os', label: 'Open Private Workspace (Life OS)', icon: Terminal, action: onOpenLifeOS, badge: 'Locked' },
+    { id: 'download', label: 'Owner Mobile Client (.apk)', icon: Smartphone, action: onOpenDownload, badge: 'Private' }
   ];
 
   const filtered = commands.filter((c) =>
@@ -29,12 +26,9 @@ export default function CommandPalette({
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        SoundFX.laser();
         if (isOpen) onClose();
         else {
-          // Trigger open via parent
-          const event = new CustomEvent('open-command-palette');
-          window.dispatchEvent(event);
+          window.dispatchEvent(new CustomEvent('open-command-palette'));
         }
       }
       if (e.key === 'Escape' && isOpen) {
@@ -49,29 +43,36 @@ export default function CommandPalette({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-md">
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-start justify-center pt-24 p-4 bg-black/25 backdrop-blur-md"
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: -20 }}
+          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0, scale: 0.97, y: -12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -20 }}
-          className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl text-slate-100"
+          exit={{ opacity: 0, scale: 0.97, y: -12 }}
+          transition={{ duration: 0.18 }}
+          className="relative w-full max-w-lg overflow-hidden rounded-[24px] bg-white border border-black/[0.08] shadow-[0_24px_64px_rgba(0,0,0,0.14)] text-[#1d1d1f]"
         >
           {/* Search Input Bar */}
-          <div className="flex items-center px-4 border-b border-slate-800">
-            <Search className="w-5 h-5 text-slate-400 shrink-0" />
+          <div className="flex items-center px-5 border-b border-black/[0.06]">
+            <Search className="w-4 h-4 text-[#86868b] shrink-0" />
             <input
               autoFocus
               type="text"
-              placeholder="Type a command or search (e.g. Life OS, Download, Sound)..."
+              placeholder="Jump to section or action..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full px-3.5 py-4 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+              className="w-full px-3.5 py-4 bg-transparent text-sm text-[#1d1d1f] placeholder-[#86868b] focus:outline-none"
             />
-            <span className="text-[10px] text-slate-500 font-mono px-1.5 py-0.5 rounded bg-slate-800">ESC</span>
+            <span className="text-[10px] text-[#86868b] font-medium px-2 py-0.5 rounded-md bg-[#f5f5f7]">
+              ESC
+            </span>
           </div>
 
           {/* Command List */}
-          <div className="p-2 max-h-72 overflow-y-auto space-y-1">
+          <div className="p-2 max-h-72 overflow-y-auto space-y-0.5">
             {filtered.length > 0 ? (
               filtered.map((cmd) => {
                 const Icon = cmd.icon;
@@ -79,22 +80,19 @@ export default function CommandPalette({
                   <button
                     key={cmd.id}
                     onClick={() => {
-                      SoundFX.click();
                       cmd.action();
                       onClose();
                     }}
-                    className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/90 transition text-left cursor-pointer group"
+                    className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl hover:bg-[#f5f5f7] transition-colors text-left cursor-pointer group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition">
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
+                      <Icon className="w-4 h-4 text-[#6e6e73] group-hover:text-[#1d1d1f] transition-colors" />
+                      <span className="text-[13px] font-medium text-[#1d1d1f]">
                         {cmd.label}
                       </span>
                     </div>
                     {cmd.badge && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-cyan-400">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#f5f5f7] text-[#6e6e73]">
                         {cmd.badge}
                       </span>
                     )}
@@ -102,8 +100,8 @@ export default function CommandPalette({
                 );
               })
             ) : (
-              <div className="p-6 text-center text-xs text-slate-500">
-                No matching commands found.
+              <div className="p-6 text-center text-xs text-[#86868b]">
+                No matching sections found.
               </div>
             )}
           </div>
