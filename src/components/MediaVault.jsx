@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOS } from '../context/OSContext';
 import {
   authorizeGoogleWorkspace,
@@ -14,10 +14,11 @@ import {
   extractYouTubePlaylistId
 } from '../services/googleIntegrations';
 import { SoundFX } from './common/SoundEffects';
+import YouTubePlayer from './common/YouTubePlayer';
 import {
   Youtube, Play, Pause, Plus, Trash2, Headphones, Download, BookmarkPlus,
   RefreshCw, Info, Square, Search, Heart, Flame, Tv, ListVideo,
-  SkipBack, SkipForward, Bookmark, Plug
+  SkipBack, SkipForward, Bookmark, Plug, PictureInPicture2
 } from 'lucide-react';
 
 export default function MediaVault() {
@@ -61,6 +62,28 @@ export default function MediaVault() {
   const [subsList, setSubsList] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [useNoCookie, setUseNoCookie] = useState(false);
+  const playerWrapRef = useRef(null);
+
+  const openFloatingMiniPlayer = (videoId) => {
+    if (!videoId) return;
+    const w = window.open(
+      `https://www.youtube.com/watch?v=${videoId}`,
+      'mahim_yt_mini',
+      'popup=yes,width=960,height=560,menubar=no,toolbar=no,location=no,status=no'
+    );
+    if (!w) {
+      window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const selectVideoAndScroll = (vid) => {
+    if (!vid) return;
+    setActiveVideo(vid);
+    SoundFX.click();
+    requestAnimationFrame(() => {
+      playerWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  };
 
   // Background Audio Track Form
   const [audTitle, setAudTitle] = useState('');
@@ -480,20 +503,16 @@ export default function MediaVault() {
       {/* Theater Player + Timestamped Notes */}
       {ytTab !== 'audio' && (
         <div className="grid lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-8 glass-crystal rounded-3xl overflow-hidden">
+          <div ref={playerWrapRef} className="lg:col-span-8 glass-crystal rounded-3xl overflow-hidden">
             {activeVideo ? (
               <>
-                <div className="aspect-video bg-black">
-                  <iframe
-                    key={`${activeVideo.id}-${useNoCookie ? 'nc' : 'std'}`}
-                    title={activeVideo.title}
-                    src={`https://${useNoCookie ? 'www.youtube-nocookie.com' : 'www.youtube.com'}/embed/${activeVideo.id}?rel=0&playsinline=1`}
-                    className="w-full h-full border-0"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                </div>
+                <YouTubePlayer
+                  videoId={activeVideo.id}
+                  title={activeVideo.title}
+                  useNoCookie={useNoCookie}
+                  onSwitchMode={(nextMode) => setUseNoCookie(nextMode)}
+                  onOpenPopup={openFloatingMiniPlayer}
+                />
                 <div className="p-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-sm text-white truncate">{activeVideo.title}</h3>
@@ -506,6 +525,14 @@ export default function MediaVault() {
                       title="Switch between Standard and Privacy YouTube embed"
                     >
                       {useNoCookie ? 'Mode: No-Cookie' : 'Mode: Standard'}
+                    </button>
+                    <button
+                      onClick={() => openFloatingMiniPlayer(activeVideo.id)}
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-200 hover:bg-rose-500/30 text-xs font-bold flex items-center gap-1"
+                      title="Open clean Floating Mini-Window player"
+                    >
+                      <PictureInPicture2 className="w-3.5 h-3.5" />
+                      <span>Mini Window</span>
                     </button>
                     <button
                       onClick={() => stepQueue(-1)}
@@ -592,7 +619,7 @@ export default function MediaVault() {
             {visibleVideos.map((v) => (
               <div
                 key={v.id}
-                onClick={() => setActiveVideo(v)}
+                onClick={() => selectVideoAndScroll(v)}
                 className={`glass-crystal rounded-2xl overflow-hidden cursor-pointer border transition ${
                   activeVideo?.id === v.id ? 'border-rose-500 ring-1 ring-rose-500/40' : 'border-white/10 hover:border-white/25'
                 }`}
