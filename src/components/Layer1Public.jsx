@@ -124,11 +124,12 @@ END:VCARD`;
 
   return (
     <div className={`min-h-screen ${themeClasses} selection:bg-indigo-500 selection:text-white relative transition-colors duration-500 overflow-x-hidden`}>
-      {/* Precision Background Grid & Radial Spotlight */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      {/* Precision Background Grid & Radial Aurora Spotlight */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:40px_40px]" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.18),transparent_70%)] blur-2xl" />
-        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.22),transparent_70%)] blur-2xl animate-aurora" />
+        <div className="absolute top-1/3 -right-40 w-96 h-96 bg-cyan-500/15 rounded-full blur-3xl animate-aurora-delayed" />
+        <div className="absolute bottom-10 -left-32 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-aurora" />
       </div>
 
       {/* 1. Interactive Cyberpunk Particle Matrix */}
@@ -244,8 +245,8 @@ END:VCARD`;
               <span className="sm:hidden">App</span>
             </button>
 
-            {/* Private Life OS Link if Unlocked */}
-            {isAuthenticated && (
+            {/* Private Life OS Link or Gate */}
+            {isAuthenticated ? (
               <button
                 onClick={() => {
                   SoundFX.click();
@@ -255,6 +256,17 @@ END:VCARD`;
               >
                 <Terminal className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Life OS</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  SoundFX.click();
+                  setShowPinModal(true);
+                }}
+                title="Open Private Life OS (PIN Protected)"
+                className="p-2 rounded-xl bg-slate-900 hover:bg-indigo-600/30 border border-slate-800 hover:border-indigo-500/40 text-slate-400 hover:text-indigo-300 transition cursor-pointer active:scale-95"
+              >
+                <Lock className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -356,7 +368,7 @@ END:VCARD`;
                 onSecretClick={handleSecretLogoClick}
               />
 
-              <TiltCard className="rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-slate-800 p-6 space-y-4 shadow-2xl shadow-indigo-950/40 relative overflow-hidden">
+              <TiltCard className="rounded-3xl glass-crystal-hover p-6 space-y-4 relative overflow-hidden">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div>
                     <span className="text-[10px] text-cyan-400 font-mono uppercase tracking-wider block">
@@ -450,7 +462,7 @@ END:VCARD`;
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.25 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-3xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-2xl shadow-2xl"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-3xl glass-crystal"
         >
           <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/70 flex items-center gap-3.5">
             <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">

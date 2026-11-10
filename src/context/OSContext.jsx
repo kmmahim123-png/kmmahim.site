@@ -315,6 +315,13 @@ export const OSProvider = ({ children }) => {
     }));
   };
 
+  const deleteProject = (projectId) => {
+    setData(prev => ({
+      ...prev,
+      projects: prev.projects.filter(p => p.id !== projectId)
+    }));
+  };
+
   const sendClientMessage = (msg) => {
     setData(prev => ({
       ...prev,
@@ -322,7 +329,65 @@ export const OSProvider = ({ children }) => {
     }));
   };
 
-  // Part 2 Actions
+  const deleteMessage = (msgId) => {
+    setData(prev => ({
+      ...prev,
+      messages: prev.messages.filter(m => m.id !== msgId)
+    }));
+  };
+
+  // Part 2 Actions — Practical Finance & Wallet Editing
+  const setWalletBalance = (walletKey, newAmount) => {
+    const val = Math.max(0, Number(newAmount) || 0);
+    setData(prev => ({
+      ...prev,
+      finance: {
+        ...prev.finance,
+        wallets: { ...prev.finance.wallets, [walletKey]: val }
+      }
+    }));
+  };
+
+  const transferBetweenWallets = ({ fromWallet, toWallet, amount, note }) => {
+    const numAmount = Number(amount);
+    if (!numAmount || numAmount <= 0 || fromWallet === toWallet) return;
+    setData(prev => {
+      const fromBal = prev.finance.wallets[fromWallet] || 0;
+      const toBal = prev.finance.wallets[toWallet] || 0;
+      const today = new Date().toISOString().slice(0, 10);
+      const txOut = {
+        id: 'tx_' + Date.now() + '_1',
+        type: 'out',
+        amount: numAmount,
+        wallet: fromWallet,
+        category: 'Wallet Transfer',
+        note: `Transfer to ${toWallet.toUpperCase()}${note ? `: ${note}` : ''}`,
+        date: today
+      };
+      const txIn = {
+        id: 'tx_' + Date.now() + '_2',
+        type: 'in',
+        amount: numAmount,
+        wallet: toWallet,
+        category: 'Wallet Transfer',
+        note: `Received from ${fromWallet.toUpperCase()}${note ? `: ${note}` : ''}`,
+        date: today
+      };
+      return {
+        ...prev,
+        finance: {
+          ...prev.finance,
+          wallets: {
+            ...prev.finance.wallets,
+            [fromWallet]: Math.max(0, fromBal - numAmount),
+            [toWallet]: toBal + numAmount
+          },
+          transactions: [txIn, txOut, ...prev.finance.transactions]
+        }
+      };
+    });
+  };
+
   const addTransaction = ({ type, amount, wallet, category, note, date }) => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) return;
@@ -349,6 +414,29 @@ export const OSProvider = ({ children }) => {
     });
   };
 
+  const deleteTransaction = (txId, revertBalance = true) => {
+    setData(prev => {
+      const target = prev.finance.transactions.find(t => t.id === txId);
+      if (!target) return prev;
+      const nextWallets = { ...prev.finance.wallets };
+      if (revertBalance && nextWallets[target.wallet] !== undefined) {
+        if (target.type === 'in') {
+          nextWallets[target.wallet] -= target.amount;
+        } else {
+          nextWallets[target.wallet] += target.amount;
+        }
+      }
+      return {
+        ...prev,
+        finance: {
+          ...prev.finance,
+          wallets: nextWallets,
+          transactions: prev.finance.transactions.filter(t => t.id !== txId)
+        }
+      };
+    });
+  };
+
   const addDebt = ({ person, type, amount, dueDate, note }) => {
     const numAmount = Number(amount);
     if (!person || !numAmount) return;
@@ -367,6 +455,27 @@ export const OSProvider = ({ children }) => {
       finance: {
         ...prev.finance,
         debts: prev.finance.debts.map(d => (d.id === debtId ? { ...d, settled: !d.settled } : d))
+      }
+    }));
+  };
+
+  const deleteDebt = (debtId) => {
+    setData(prev => ({
+      ...prev,
+      finance: {
+        ...prev.finance,
+        debts: prev.finance.debts.filter(d => d.id !== debtId)
+      }
+    }));
+  };
+
+  const resetFinanceData = () => {
+    setData(prev => ({
+      ...prev,
+      finance: {
+        wallets: { cash: 0, bkash: 0, nagad: 0, bank: 0 },
+        transactions: [],
+        debts: []
       }
     }));
   };
@@ -402,12 +511,72 @@ export const OSProvider = ({ children }) => {
     });
   };
 
+  const deleteMealDeposit = (depId) => {
+    setData(prev => ({
+      ...prev,
+      meals: {
+        ...prev.meals,
+        deposits: prev.meals.deposits.filter(d => d.id !== depId)
+      }
+    }));
+  };
+
   const updateDailyMeal = (dateKey, mealData) => {
     setData(prev => ({
       ...prev,
       meals: { ...prev.meals, logs: { ...prev.meals.logs, [dateKey]: mealData } }
     }));
   };
+
+  const deleteMealLog = (dateKey) => {
+    setData(prev => {
+      const nextLogs = { ...prev.meals.logs };
+      delete nextLogs[dateKey];
+      return {
+        ...prev,
+        meals: { ...prev.meals, logs: nextLogs }
+      };
+    });
+  };
+
+  const resetMealsData = () => {
+    setData(prev => ({
+      ...prev,
+      meals: {
+        ...prev.meals,
+        deposits: [],
+        logs: {}
+      }
+    }));
+  };
+
+  const resetAllPersonalOSData = () => {
+    setData(prev => ({
+      ...prev,
+      finance: {
+        wallets: { cash: 0, bkash: 0, nagad: 0, bank: 0 },
+        transactions: [],
+        debts: []
+      },
+      meals: {
+        ...prev.meals,
+        deposits: [],
+        logs: {}
+      },
+      habits: {
+        minoxidilBottleStart: new Date().toISOString().slice(0, 10),
+        dailyLogs: {}
+      },
+      goals: [],
+      ideas: []
+    }));
+  };
+
+  const hasDemoData = Boolean(
+    data.finance?.transactions?.some(t => t.id === 't1' || t.id === 't2') ||
+    data.finance?.debts?.some(d => d.id === 'd1') ||
+    data.meals?.deposits?.some(d => d.id === 'dep1')
+  );
 
   // Part 3 Actions
   const updateDailyHabits = (dateKey, habitUpdater) => {
@@ -546,13 +715,25 @@ export const OSProvider = ({ children }) => {
         verifyPin,
         updateProfile,
         addProject,
+        deleteProject,
         sendClientMessage,
+        deleteMessage,
+        setWalletBalance,
+        transferBetweenWallets,
         addTransaction,
+        deleteTransaction,
         addDebt,
         toggleDebtSettled,
+        deleteDebt,
+        resetFinanceData,
         updateMealSettings,
         addMealDeposit,
+        deleteMealDeposit,
         updateDailyMeal,
+        deleteMealLog,
+        resetMealsData,
+        resetAllPersonalOSData,
+        hasDemoData,
         updateDailyHabits,
         updateMinoxidilStart,
         addGoal,
