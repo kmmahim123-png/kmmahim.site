@@ -1,5 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { uploadLifeOSData, fetchLifeOSData } from '../services/supabaseClient';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import {
+  uploadLifeOSData,
+  fetchLifeOSData,
+  subscribeToLifeOS
+} from '../services/supabaseClient';
 
 const OSContext = createContext();
 
@@ -272,14 +276,18 @@ export const OSProvider = ({ children }) => {
 
   // Supabase Cloud Sync State & Actions
   const [syncStatus, setSyncStatus] = useState({
-    status: 'idle', // 'idle' | 'syncing' | 'success' | 'error'
+    status: 'idle', // 'idle' | 'syncing' | 'success' | 'needs_setup' | 'error'
     lastSync: null,
     message: ''
   });
 
+  // Default Auto-Sync to TRUE so Laptop <-> Mobile sync works automatically
   const [autoSync, setAutoSync] = useState(() => {
-    return localStorage.getItem('KM_MAHIM_AUTOSYNC') === 'true';
+    return localStorage.getItem('KM_MAHIM_AUTOSYNC') !== 'false';
   });
+
+  const isApplyingRemoteRef = useRef(false);
+  const isFirstRenderRef = useRef(true);
 
   const toggleAutoSync = () => {
     setAutoSync((prev) => {
@@ -289,11 +297,29 @@ export const OSProvider = ({ children }) => {
     });
   };
 
+  const applyRemoteData = (remoteData, remoteTimestamp) => {
+    if (!remoteData) return;
+    isApplyingRemoteRef.current = true;
+    setData((prev) => ({
+      ...prev,
+      ...remoteData
+    }));
+    if (remoteTimestamp) {
+      localStorage.setItem('KM_MAHIM_LAST_MODIFIED', remoteTimestamp);
+    }
+    setTimeout(() => {
+      isApplyingRemoteRef.current = false;
+    }, 500);
+  };
+
   const uploadToSupabase = async (overrideData = null) => {
-    setSyncStatus({ status: 'syncing', lastSync: null, message: 'Uploading to Supabase...' });
+    setSyncStatus({ status: 'syncing', lastSync: null, message: 'Supabase ডাটাবেসে সেভ হচ্ছে...' });
     const payload = overrideData || data;
     const result = await uploadLifeOSData('primary_os', payload);
     if (result.success) {
+      if (result.timestamp) {
+        localStorage.setItem('KM_MAHIM_LAST_MODIFIED', result.timestamp);
+      }
       setSyncStatus({
         status: 'success',
         lastSync: result.timestamp,
@@ -302,7 +328,7 @@ export const OSProvider = ({ children }) => {
       return true;
     } else {
       setSyncStatus({
-        status: 'error',
+        status: result.needsSetup ? 'needs_setup' : 'error',
         lastSync: null,
         message: result.message
       });
@@ -310,44 +336,129 @@ export const OSProvider = ({ children }) => {
     }
   };
 
-  const pullFromSupabase = async () => {
-    setSyncStatus({ status: 'syncing', lastSync: null, message: 'Pulling latest from Supabase...' });
+  const pullFromSupabase = async (silent = false) => {
+    if (!silent) {
+      setSyncStatus({ status: 'syncing', lastSync: null, message: 'ডাটাবেস থেকে লেটেস্ট ডেটা আনা হচ্ছে...' });
+    }
     const result = await fetchLifeOSData('primary_os');
     if (result.success && result.data) {
-      setData((prev) => ({
-        ...prev,
-        ...result.data
-      }));
+      applyRemoteData(result.data, result.timestamp);
       setSyncStatus({
         status: 'success',
         lastSync: result.timestamp,
-        message: 'Restored from Supabase cloud!'
+        message: 'Supabase থেকে লেটেস্ট ডেটা সিঙ্ক হয়েছে! ☁️'
       });
       return true;
+    } else if (result.success && result.empty) {
+      setSyncStatus({
+        status: 'idle',
+        lastSync: null,
+        message: 'Supabase টেবিল খালি আছে — যেকোনো আপডেট করলেই সেভ হবে।'
+      });
+      return false;
     } else {
       setSyncStatus({
-        status: 'error',
+        status: result.needsSetup ? 'needs_setup' : 'error',
         lastSync: null,
-        message: result.message || 'No cloud backup found'
+        message: result.message || 'ডাটাবেস কানেকশন পাওয়া যায়নি'
       });
       return false;
     }
   };
 
-  // Auto-sync debounce on data changes
+  // Startup Cloud Fetch & Live Realtime Subscription (Laptop <-> Mobile instant sync)
   useEffect(() => {
+    const syncOnOpen = async () => {
+      const result = await fetchLifeOSData('primary_os');
+      if (result.needsSetup) {
+        setSyncStatus({
+          status: 'needs_setup',
+          lastSync: null,
+          message: result.message
+        });
+        return;
+      }
+      if (result.success && result.data) {
+        const remoteTime = new Date(result.timestamp || 0).getTime();
+        const localTime = new Date(localStorage.getItem('KM_MAHIM_LAST_MODIFIED') || 0).getTime();
+        // Pull cloud data if it is newer than local device (or local hasn't synced yet)
+        if (remoteTime > localTime || !localTime) {
+          applyRemoteData(result.data, result.timestamp);
+          setSyncStatus({
+            status: 'success',
+            lastSync: result.timestamp,
+            message: 'অন্য ডিভাইসের লেটেস্ট ডেটা সিঙ্ক হয়েছে! ☁️'
+          });
+        } else {
+          setSyncStatus({
+            status: 'success',
+            lastSync: result.timestamp,
+            message: 'Supabase Live Connected 🟢'
+          });
+        }
+      }
+    };
+
+    syncOnOpen();
+
+    // Realtime channel listener
+    const unsubscribe = subscribeToLifeOS('primary_os', (remoteData, remoteTimestamp) => {
+      const localTime = new Date(localStorage.getItem('KM_MAHIM_LAST_MODIFIED') || 0).getTime();
+      const remoteTime = new Date(remoteTimestamp || 0).getTime();
+      if (remoteTime > localTime) {
+        applyRemoteData(remoteData, remoteTimestamp);
+        setSyncStatus({
+          status: 'success',
+          lastSync: remoteTimestamp,
+          message: 'লাইভ আপডেট রিসিভ হয়েছে! ⚡'
+        });
+      }
+    });
+
+    // Also refresh whenever mobile app / tab comes back into foreground
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncOnOpen();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
+
+  // Auto-sync debounce on local user edits
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
+    if (isApplyingRemoteRef.current) return;
+
+    const nowIso = new Date().toISOString();
+    localStorage.setItem('KM_MAHIM_LAST_MODIFIED', nowIso);
+
     if (!autoSync) return;
     const timeout = setTimeout(() => {
+      setSyncStatus((prev) => ({ ...prev, status: 'syncing', message: 'Auto-syncing...' }));
       uploadLifeOSData('primary_os', data).then((res) => {
         if (res.success) {
           setSyncStatus({
             status: 'success',
             lastSync: res.timestamp,
-            message: 'Auto-synced to Supabase ⚡'
+            message: 'অটো-সিঙ্ক সম্পন্ন! ☁️'
+          });
+        } else {
+          setSyncStatus({
+            status: res.needsSetup ? 'needs_setup' : 'error',
+            lastSync: null,
+            message: res.message
           });
         }
       });
-    }, 4000);
+    }, 1500); // 1.5s fast sync
     return () => clearTimeout(timeout);
   }, [data, autoSync]);
 

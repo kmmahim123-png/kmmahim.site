@@ -22,7 +22,7 @@ export default function SupabaseSyncModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const sqlSetupSnippet = `-- Run this in Supabase SQL Editor (Project: uqupazmycylfcqvsajnx)
+  const sqlSetupSnippet = `-- Run this ONCE in Supabase SQL Editor (Project: uqupazmycylfcqvsajnx)
 CREATE TABLE IF NOT EXISTS public.mahim_life_os (
   slot text PRIMARY KEY,
   owner text DEFAULT 'KM Mahim',
@@ -30,14 +30,17 @@ CREATE TABLE IF NOT EXISTS public.mahim_life_os (
   updated_at timestamptz DEFAULT timezone('utc'::text, now())
 );
 
--- Enable Row Level Security & Allow Anonymous Access for Personal OS
 ALTER TABLE public.mahim_life_os ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public all access" ON public.mahim_life_os;
 CREATE POLICY "Allow public all access" 
 ON public.mahim_life_os 
 FOR ALL 
 USING (true) 
-WITH CHECK (true);`;
+WITH CHECK (true);
+
+-- Enable instant Laptop <-> Mobile Realtime Sync
+ALTER PUBLICATION supabase_realtime ADD TABLE public.mahim_life_os;`;
 
   const handleCopySql = () => {
     SoundFX.click();
@@ -59,8 +62,8 @@ WITH CHECK (true);`;
   const recordsCount = {
     transactions: data.finance?.transactions?.length || 0,
     wallets: Object.keys(data.finance?.wallets || {}).length,
-    meals: data.meals?.dailyLogs ? Object.keys(data.meals.dailyLogs).length : 0,
-    habits: data.habits?.logs ? Object.keys(data.habits.logs).length : 0,
+    meals: data.meals?.logs ? Object.keys(data.meals.logs).length : 0,
+    habits: data.habits?.dailyLogs ? Object.keys(data.habits.dailyLogs).length : 0,
     goals: data.goals?.length || 0,
     ideas: data.ideas?.length || 0,
     projects: data.projects?.length || 0,
@@ -145,9 +148,11 @@ WITH CHECK (true);`;
               <>
                 {/* Sync Status Banner */}
                 <div
-                  className={`p-4 rounded-2xl border flex items-center justify-between ${
+                  className={`p-4 rounded-2xl border flex flex-col gap-3 ${
                     syncStatus.status === 'success'
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                      : syncStatus.status === 'needs_setup'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
                       : syncStatus.status === 'error'
                       ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
                       : syncStatus.status === 'syncing'
@@ -155,31 +160,51 @@ WITH CHECK (true);`;
                       : 'bg-slate-950/80 border-slate-800 text-slate-300'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    {syncStatus.status === 'syncing' ? (
-                      <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin" />
-                    ) : syncStatus.status === 'success' ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    ) : (
-                      <Server className="w-5 h-5 text-slate-400" />
-                    )}
-                    <div>
-                      <div className="font-semibold text-sm">
-                        {syncStatus.status === 'syncing'
-                          ? 'Syncing with Supabase...'
-                          : syncStatus.status === 'success'
-                          ? 'Cloud Sync Complete!'
-                          : 'Supabase Ready'}
-                      </div>
-                      <div className="text-[11px] opacity-80">
-                        {syncStatus.message || 'Ready to push local OS state to cloud.'}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      {syncStatus.status === 'syncing' ? (
+                        <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin" />
+                      ) : syncStatus.status === 'success' ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      ) : syncStatus.status === 'needs_setup' ? (
+                        <AlertCircle className="w-5 h-5 text-amber-400 animate-pulse" />
+                      ) : (
+                        <Server className="w-5 h-5 text-slate-400" />
+                      )}
+                      <div>
+                        <div className="font-semibold text-sm">
+                          {syncStatus.status === 'syncing'
+                            ? 'Syncing with Supabase...'
+                            : syncStatus.status === 'success'
+                            ? 'Cloud Live Synced! (Laptop ⇄ Mobile)'
+                            : syncStatus.status === 'needs_setup'
+                            ? '⚠️ টেবিল তৈরি করা বাকি আছে!'
+                            : syncStatus.status === 'error'
+                            ? 'Sync Error'
+                            : 'Supabase Ready'}
+                        </div>
+                        <div className="text-[11px] opacity-90">
+                          {syncStatus.message || 'Ready to sync OS data with Supabase cloud.'}
+                        </div>
                       </div>
                     </div>
+                    {syncStatus.lastSync && (
+                      <span className="text-[10px] font-mono bg-slate-900 px-2 py-1 rounded-lg border border-slate-800 shrink-0">
+                        {new Date(syncStatus.lastSync).toLocaleTimeString()}
+                      </span>
+                    )}
                   </div>
-                  {syncStatus.lastSync && (
-                    <span className="text-[10px] font-mono bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
-                      {new Date(syncStatus.lastSync).toLocaleTimeString()}
-                    </span>
+
+                  {syncStatus.status === 'needs_setup' && (
+                    <button
+                      onClick={() => {
+                        handleCopySql();
+                        setActiveTab('sql');
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition"
+                    >
+                      ১. SQL কপি করুন ও টেবিল তৈরি করতে এখানে চাপুন →
+                    </button>
                   )}
                 </div>
 

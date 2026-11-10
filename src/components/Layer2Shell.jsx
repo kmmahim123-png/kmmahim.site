@@ -157,13 +157,27 @@ export default function Layer2Shell() {
                   SoundFX.click();
                   setShowSyncModal(true);
                 }}
-                className="px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 hover:border-emerald-400 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 transition"
+                className={`px-3 py-1.5 rounded-full border text-[11px] font-bold flex items-center gap-1.5 transition ${
+                  syncStatus.status === 'needs_setup'
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 animate-pulse'
+                    : syncStatus.status === 'error'
+                    ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                    : 'bg-emerald-500/15 border-emerald-500/30 hover:border-emerald-400 text-emerald-300'
+                }`}
               >
-                <Cloud className="w-3.5 h-3.5 animate-pulse" />
+                <Cloud className={`w-3.5 h-3.5 ${syncStatus.status === 'syncing' ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">
-                  {syncStatus.status === 'success' ? 'Cloud Synced' : 'Supabase Sync'}
+                  {syncStatus.status === 'needs_setup'
+                    ? '⚠️ Setup DB'
+                    : syncStatus.status === 'syncing'
+                    ? 'Syncing...'
+                    : syncStatus.status === 'success'
+                    ? 'Cloud Synced'
+                    : 'Supabase Sync'}
                 </span>
-                <span className="sm:hidden">Cloud</span>
+                <span className="sm:hidden">
+                  {syncStatus.status === 'needs_setup' ? '⚠️ DB' : 'Cloud'}
+                </span>
               </button>
 
               <button
