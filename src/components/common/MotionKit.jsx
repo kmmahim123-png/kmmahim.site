@@ -218,3 +218,262 @@ export function SecretPWAWidget() {
     </motion.div>
   );
 }
+
+// --- CIRCULAR HERO RADAR COMPONENT (A1: Profile Hero & Live Radar Node) ---
+export function CircularHeroRadar({ profile, onSecretClick }) {
+  return (
+    <div className="relative flex flex-col items-center justify-center p-4 text-center select-none">
+      {/* Outer Breathing Pulse Radar Waves (A3: Breathing Pulse Glow) */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <motion.div
+          animate={{ scale: [1, 1.25, 1], opacity: [0.35, 0.08, 0.35] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-52 h-52 sm:w-60 sm:h-60 rounded-full border border-indigo-500/30 bg-indigo-500/5 blur-sm"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.45, 1], opacity: [0.22, 0, 0.22] }}
+          transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut', delay: 0.6 }}
+          className="w-60 h-60 sm:w-72 sm:h-72 rounded-full border border-cyan-500/20"
+        />
+      </div>
+
+      {/* 360° Rotating Gradient Orbital Ring with Orbiting Satellites */}
+      <div className="relative w-44 h-44 sm:w-52 sm:h-52 flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+          className="absolute inset-0 rounded-full border-2 border-dashed border-indigo-500/40"
+        >
+          {/* Orbiting Satellite Dots */}
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee]" />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
+        </motion.div>
+
+        {/* Inner 3D Tilt Circular Badge */}
+        <TiltCard
+          maxTilt={14}
+          className="w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-gradient-to-br from-slate-900 via-indigo-950/80 to-slate-950 border-2 border-indigo-500/50 shadow-2xl shadow-indigo-950/80 flex flex-col items-center justify-center p-3 relative z-10 cursor-pointer overflow-hidden group"
+        >
+          <div
+            onClick={onSecretClick}
+            title="Triple-click for Secret Life OS Gate"
+            className="w-full h-full flex flex-col items-center justify-center text-center"
+          >
+            {/* Live Center Radar Ping */}
+            <div className="relative flex items-center justify-center mb-1">
+              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+            </div>
+
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-cyan-400 to-emerald-400 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/40 mb-1 group-hover:scale-105 transition">
+              KM
+            </div>
+
+            <h3 className="font-black text-white text-xs sm:text-sm tracking-tight leading-tight">
+              {profile.name}
+            </h3>
+            <span className="text-[10px] text-cyan-300 font-medium">
+              {profile.bnName}
+            </span>
+
+            <div className="mt-1 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-[8px] text-indigo-300 font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>ACTIVE OS NODE</span>
+            </div>
+          </div>
+        </TiltCard>
+      </div>
+
+      <p className="mt-2 text-[10px] text-slate-400 font-mono tracking-wider">
+        RADAR STATUS: <span className="text-emerald-400 font-semibold">100% ONLINE</span>
+      </p>
+    </div>
+  );
+}
+
+// --- CIRCULAR FINANCE DONUT DIAL (A2: Interactive Donut Pie-Chart Dial) ---
+const CATEGORY_COLORS = {
+  'Food & Meal': '#f43f5e',
+  'Gym & Fitness': '#06b6d4',
+  'Study & Academic': '#f59e0b',
+  'Business / JACKFRU': '#6366f1',
+  'Client Project': '#10b981',
+  'Personal & Care': '#ec4899',
+  'Tech & AI APIs': '#8b5cf6',
+  'Other': '#64748b'
+};
+
+export function CircularFinanceDonut({
+  totalBalance = 0,
+  totalIn = 0,
+  totalOut = 0,
+  categoryBreakdown = []
+}) {
+  const [hoveredSlice, setHoveredSlice] = useState(null);
+
+  const radius = 72;
+  const strokeWidth = 14;
+  const circumference = 2 * Math.PI * radius; // ~452.39
+
+  const totalExpense = categoryBreakdown.reduce((sum, [, val]) => sum + val, 0) || 1;
+
+  // Build segments
+  let accumulated = 0;
+  const segments = categoryBreakdown.map(([cat, amount]) => {
+    const fraction = amount / totalExpense;
+    const strokeDash = fraction * circumference;
+    const offset = accumulated;
+    accumulated += strokeDash;
+    return {
+      category: cat,
+      amount,
+      percentage: Math.round(fraction * 100),
+      strokeDasharray: `${strokeDash} ${circumference - strokeDash}`,
+      strokeDashoffset: -offset,
+      color: CATEGORY_COLORS[cat] || '#818cf8'
+    };
+  });
+
+  return (
+    <TiltCard
+      maxTilt={8}
+      className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 shadow-2xl shadow-indigo-950/50 flex flex-col items-center relative overflow-hidden"
+    >
+      {/* Outer Breathing Pulse Radar Glow (A3: Breathing Pulse Glow) */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], opacity: [0.25, 0.05, 0.25] }}
+          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="w-56 h-56 rounded-full bg-gradient-to-tr from-indigo-500/20 via-cyan-500/20 to-rose-500/10 blur-xl"
+        />
+      </div>
+
+      <div className="w-full flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3 relative z-10">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+            Interactive Financial Ring
+          </span>
+          <h3 className="text-sm font-bold text-white">Expense & Liquidity Dial</h3>
+        </div>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          60 FPS Live
+        </span>
+      </div>
+
+      {/* Circular Donut Arc Dial */}
+      <div className="relative w-56 h-56 flex items-center justify-center relative z-10">
+        <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 200 200">
+          {/* Background track circle */}
+          <circle
+            cx="100"
+            cy="100"
+            r={radius}
+            fill="transparent"
+            stroke="rgba(30, 41, 59, 0.6)"
+            strokeWidth={strokeWidth}
+          />
+
+          {/* Slices */}
+          {segments.length > 0 ? (
+            segments.map((s, idx) => (
+              <motion.circle
+                key={idx}
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="transparent"
+                stroke={s.color}
+                strokeWidth={hoveredSlice?.category === s.category ? strokeWidth + 4 : strokeWidth}
+                strokeDasharray={s.strokeDasharray}
+                strokeDashoffset={s.strokeDashoffset}
+                strokeLinecap="round"
+                className="cursor-pointer transition-all duration-300"
+                onMouseEnter={() => setHoveredSlice(s)}
+                onMouseLeave={() => setHoveredSlice(null)}
+                style={{
+                  filter: hoveredSlice?.category === s.category ? `drop-shadow(0 0 8px ${s.color})` : 'none',
+                }}
+              />
+            ))
+          ) : (
+            <circle
+              cx="100"
+              cy="100"
+              r={radius}
+              fill="transparent"
+              stroke="#6366f1"
+              strokeWidth={strokeWidth}
+              strokeDasharray={circumference}
+              opacity={0.4}
+            />
+          )}
+        </svg>
+
+        {/* Center Display */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+          {hoveredSlice ? (
+            <motion.div
+              key="hovered"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.15 }}
+            >
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider block"
+                style={{ color: hoveredSlice.color }}
+              >
+                {hoveredSlice.category}
+              </span>
+              <span className="text-xl font-black text-white block">
+                ৳{hoveredSlice.amount.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {hoveredSlice.percentage}% of Expense
+              </span>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="default"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <span className="text-[9px] font-bold uppercase tracking-widest text-indigo-300 block">
+                Net Worth Liquidity
+              </span>
+              <span className="text-2xl font-black text-white block my-0.5">
+                ৳<AnimatedCounter value={totalBalance} />
+              </span>
+              <span className="text-[10px] text-emerald-400 font-semibold block">
+                In: ৳{totalIn.toLocaleString()}
+              </span>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Category Legend Chips */}
+      <div className="w-full mt-4 flex flex-wrap justify-center gap-1.5 relative z-10">
+        {segments.map((s, idx) => (
+          <button
+            key={idx}
+            onMouseEnter={() => setHoveredSlice(s)}
+            onMouseLeave={() => setHoveredSlice(null)}
+            className={`px-2 py-1 rounded-lg text-[10px] font-medium border transition flex items-center gap-1.5 cursor-pointer ${
+              hoveredSlice?.category === s.category
+                ? 'bg-slate-800 text-white border-slate-600 scale-105'
+                : 'bg-slate-950/60 text-slate-400 border-slate-800/80 hover:text-slate-200'
+            }`}
+          >
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: s.color, boxShadow: `0 0 6px ${s.color}` }}
+            />
+            <span>{s.category}</span>
+            <span className="text-slate-500 font-mono">({s.percentage}%)</span>
+          </button>
+        ))}
+      </div>
+    </TiltCard>
+  );
+}

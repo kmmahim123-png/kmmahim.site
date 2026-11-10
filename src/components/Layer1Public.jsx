@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useOS } from '../context/OSContext';
-import { TiltCard, AnimatedCounter } from './common/MotionKit';
+import { TiltCard, AnimatedCounter, CircularHeroRadar } from './common/MotionKit';
 import {
   Sparkles, Code2, Cpu, Globe, ArrowUpRight, CheckCircle2,
   Send, Calendar, Download, Shield, Layers, Terminal, Phone,
@@ -193,51 +193,58 @@ END:VCARD`;
             </div>
           </motion.div>
 
-          {/* Identity Quick Card with 3D Tilt */}
-          <TiltCard className="lg:col-span-4 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-6 space-y-4 shadow-2xl shadow-indigo-950/40">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <p className="text-xs text-slate-400">Core Identity</p>
-                <h3 className="text-lg font-bold text-white">{profile.name}</h3>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Available for Projects
-              </span>
-            </div>
+          {/* Identity Quick Card with 3D Tilt & Circular Radar Centerpiece (A1 + A3) */}
+          <div className="lg:col-span-4 space-y-4">
+            <CircularHeroRadar
+              profile={profile}
+              onSecretClick={handleSecretLogoClick}
+            />
 
-            <div className="space-y-2.5 text-xs text-slate-300">
-              <div className="flex items-start gap-2.5">
-                <Globe className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5"/>
-                <span>{profile.department}</span>
+            <TiltCard className="rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-5 space-y-3.5 shadow-2xl shadow-indigo-950/40">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div>
+                  <p className="text-[11px] text-slate-400">Core Identity</p>
+                  <h3 className="text-base font-bold text-white">{profile.name}</h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                  ● Available
+                </span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <MapPin className="w-4 h-4 text-cyan-400 shrink-0"/>
-                <span>{profile.location}</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <Cpu className="w-4 h-4 text-emerald-400 shrink-0"/>
-                <span>AI Stack: OpenClaw • Grok • Hermes • Webhooks</span>
-              </div>
-            </div>
 
-            <div id="links" className="pt-3 border-t border-slate-800 flex items-center justify-between">
-              <span className="text-xs text-slate-400">Connect:</span>
-              <div className="flex items-center gap-2">
-                <a href={profile.socials.facebook} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition">
-                  <Facebook className="w-4 h-4"/>
-                </a>
-                <a href={profile.socials.linkedin} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition">
-                  <Linkedin className="w-4 h-4"/>
-                </a>
-                <a href={profile.socials.twitter} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition">
-                  <Twitter className="w-4 h-4"/>
-                </a>
-                <a href={profile.socials.youtube} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-red-600 transition">
-                  <Youtube className="w-4 h-4"/>
-                </a>
+              <div className="space-y-2 text-xs text-slate-300">
+                <div className="flex items-start gap-2.5">
+                  <Globe className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5"/>
+                  <span>{profile.department}</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <MapPin className="w-4 h-4 text-cyan-400 shrink-0"/>
+                  <span>{profile.location}</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <Cpu className="w-4 h-4 text-emerald-400 shrink-0"/>
+                  <span>AI Stack: OpenClaw • Grok • Hermes</span>
+                </div>
               </div>
-            </div>
-          </TiltCard>
+
+              <div id="links" className="pt-2.5 border-t border-slate-800 flex items-center justify-between">
+                <span className="text-xs text-slate-400">Socials:</span>
+                <div className="flex items-center gap-2">
+                  <a href={profile.socials.facebook} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition">
+                    <Facebook className="w-3.5 h-3.5"/>
+                  </a>
+                  <a href={profile.socials.linkedin} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition">
+                    <Linkedin className="w-3.5 h-3.5"/>
+                  </a>
+                  <a href={profile.socials.twitter} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-indigo-600 transition">
+                    <Twitter className="w-3.5 h-3.5"/>
+                  </a>
+                  <a href={profile.socials.youtube} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-slate-800 hover:bg-red-600 transition">
+                    <Youtube className="w-3.5 h-3.5"/>
+                  </a>
+                </div>
+              </div>
+            </TiltCard>
+          </div>
         </div>
 
         {/* Dynamic Metric Counter Strip (Ultra Motion) */}
