@@ -279,7 +279,7 @@ export default function IntegrationsHub() {
                 <i>OAuth Consent Screen</i>-এ নিজের Gmail-টি Test User হিসেবে যোগ করুন।
               </li>
               <li>
-                <i>Credentials → Create OAuth Client ID (Web Application)</i>-এ গিয়ে Authorized JavaScript Origin-এ <code className="text-cyan-300">https://kmmahim-site.vercel.app</code> (এবং লোকালের জন্য <code className="text-cyan-300">http://localhost:5173</code>) বসান।
+                <i>Credentials → Create OAuth Client ID (Web Application)</i>-এ গিয়ে Authorized JavaScript Origin-এ <code className="text-cyan-300">https://kmmahim.site</code>, <code className="text-cyan-300">https://kmmahim-site.vercel.app</code> (এবং লোকালের জন্য <code className="text-cyan-300">http://localhost:5173</code>) বসান।
               </li>
               <li>Client ID এখানে পেস্ট করে <b>Connect</b> চাপুন—এরপর AI-কে বললেই ইমেইল, ক্যালেন্ডার ও কন্টাক্টস চালাবে!</li>
             </ol>

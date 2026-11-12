@@ -79,7 +79,7 @@ TITLE:${profile.tagline}
 TEL;TYPE=CELL:${profile.phone}
 EMAIL:${profile.email}
 NOTE:${profile.department}
-URL:https://kmmahim-site.vercel.app
+URL:https://kmmahim.site
 END:VCARD`;
     const blob = new Blob([vcard], { type: 'text/vcard' });
     const url = URL.createObjectURL(blob);
